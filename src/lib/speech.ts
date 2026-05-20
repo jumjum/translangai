@@ -15,10 +15,20 @@
 //   3) Final-segment dedup — if a new final chunk equals the tail of the
 //      cumulative transcript (case-insensitive), drop it. This protects
 //      against engines that occasionally fire `onresult(isFinal)` twice
-//      for the same phrase during a session restart.
+//      for the same phrase during a session restart (iOS behaviour).
 //
 //   4) Silenced error noise — "no-speech" and "aborted" are normal during
 //      natural pauses; we don't surface them as user-visible errors.
+//
+//   5) Chrome Android incremental-final fix — Chrome fires isFinal=true
+//      multiple times per utterance with a growing transcript:
+//      "I don't" → "I don't want" → "I don't want any" …
+//      Without handling this, each chunk appends to finalRef producing
+//      "I don't I don't want I don't want any …".
+//      We track the last appended final (lastFinalRef). When the new
+//      final starts with the previous one, we replace rather than append.
+//      lastFinalRef resets on every session start so phrases from separate
+//      restarts are never incorrectly merged.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -71,6 +81,7 @@ export function useSpeechRecognition(lang: string) {
   // Persistent refs across the recognition session lifetime.
   const recogRef = useRef<any>(null);
   const finalRef = useRef("");
+  const lastFinalRef = useRef(""); // last chunk appended — Chrome Android prefix check
   const intentRef = useRef(false);   // user wants to be listening
   const pausedRef = useRef(false);   // internally paused (e.g., TTS playing)
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,7 +114,12 @@ export function useSpeechRecognition(lang: string) {
     r.interimResults = true;
     r.maxAlternatives = 1;
 
-    r.onstart = () => setState((s) => ({ ...s, error: undefined }));
+    r.onstart = () => {
+      // Reset the per-session last-final tracker so phrases from previous
+      // sessions don't pollute the Chrome-incremental-final check.
+      lastFinalRef.current = "";
+      setState((s) => ({ ...s, error: undefined }));
+    };
 
     r.onerror = (e: any) => {
       const code = e?.error ? String(e.error) : "speech-error";
@@ -136,13 +152,34 @@ export function useSpeechRecognition(lang: string) {
         else interim += (interim ? " " : "") + txt;
       }
       if (appended) {
-        // Dedup: drop the appended chunk if it just repeats the tail of finalRef.
-        const tail = finalRef.current
-          .slice(Math.max(0, finalRef.current.length - appended.length - 2))
-          .toLowerCase()
-          .trim();
-        if (tail !== appended.toLowerCase().trim()) {
-          finalRef.current = (finalRef.current + " " + appended).trim();
+        const norm = (s: string) => s.toLowerCase().trim();
+        const prev = lastFinalRef.current;
+
+        if (prev && norm(appended).startsWith(norm(prev))) {
+          // ── Chrome Android incremental-final ──────────────────────────────
+          // Chrome fires isFinal=true with a growing transcript per utterance:
+          //   "I don't" → "I don't want" → "I don't want any" …
+          // Replace the previous segment at the tail of finalRef rather than
+          // appending again.
+          const base = finalRef.current
+            .slice(0, Math.max(0, finalRef.current.length - prev.length))
+            .trim();
+          finalRef.current = base ? base + " " + appended : appended;
+          lastFinalRef.current = appended;
+        } else {
+          // ── iOS / standard: tail-exact dedup ─────────────────────────────
+          // Drop if the new chunk exactly equals the tail of what we already
+          // have (protects against iOS double-fire across session restarts).
+          const tail = finalRef.current
+            .slice(Math.max(0, finalRef.current.length - appended.length - 2))
+            .toLowerCase()
+            .trim();
+          if (norm(tail) !== norm(appended)) {
+            finalRef.current = (finalRef.current + " " + appended).trim();
+            lastFinalRef.current = appended;
+          }
+          // If it was a duplicate, keep lastFinalRef so subsequent incremental
+          // events from Chrome still get matched correctly.
         }
       }
       const finalText = finalRef.current;
@@ -208,6 +245,7 @@ export function useSpeechRecognition(lang: string) {
 
   const reset = useCallback(() => {
     finalRef.current = "";
+    lastFinalRef.current = "";
     setState((s) => ({ ...s, finalText: "", interim: "", liveText: "" }));
   }, []);
 
