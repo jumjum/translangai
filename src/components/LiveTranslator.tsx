@@ -1,0 +1,527 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import LanguageBar from "@/components/LanguageBar";
+import {
+  isIos,
+  isSpeechRecognitionSupported,
+  isTtsSupported,
+  listVoicesForLang,
+  speak,
+  stopSpeaking,
+  useSpeechRecognition,
+} from "@/lib/speech";
+import { LANG_META, type Lang, type TranslateResult } from "@/lib/types";
+
+type Props = {
+  src: Lang;
+  tgt: Lang;
+  setSrc: (l: Lang) => void;
+  setTgt: (l: Lang) => void;
+  onSwap: () => void;
+  freeMode: boolean;
+};
+
+/** Free chain — used while free mode is on. */
+const FREE_CHAIN = ["mymemory", "lingva", "libre", "local"] as const;
+/** Paid chain — LLM first (idiom-aware), then free fallbacks. */
+const PAID_CHAIN = ["llm", "mymemory", "lingva", "libre", "local"] as const;
+
+const SUMMARY_THRESHOLD_WORDS = 500;
+
+function wordCount(s: string): number {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
+export default function LiveTranslator({ src, tgt, setSrc, setTgt, onSwap, freeMode }: Props) {
+  const speech = useSpeechRecognition(LANG_META[src].bcp47);
+  const { pause: pauseListening, resume: resumeListening } = speech;
+  const [translation, setTranslation] = useState<TranslateResult | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [manualText, setManualText] = useState("");
+
+  // Voice picker
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string | undefined>(undefined);
+
+  // Executive summary state
+  const [summary, setSummary] = useState<{ text: string; provider: string; note?: string } | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+
+  const lastSpokenRef = useRef("");
+  const lastSpeakAtRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const ttsSupported = isTtsSupported();
+  const asrSupported = isSpeechRecognitionSupported();
+
+  // Use either live speech or manual input.
+  const sourceText = speech.liveText || manualText;
+
+  // Refresh voice list when the target language changes.
+  useEffect(() => {
+    listVoicesForLang(LANG_META[tgt].tts).then((vs) => {
+      setVoices(vs);
+      // Restore persisted choice if still available; otherwise auto-pick first.
+      const saved = localStorage.getItem(`translangai:voice:${tgt}`);
+      if (saved && vs.some((v) => v.voiceURI === saved)) {
+        setVoiceURI(saved);
+      } else {
+        setVoiceURI(undefined); // "Auto" — let `speak()` pick best
+      }
+    });
+  }, [tgt]);
+
+  const pickVoice = (uri: string | undefined) => {
+    setVoiceURI(uri);
+    if (uri) localStorage.setItem(`translangai:voice:${tgt}`, uri);
+    else localStorage.removeItem(`translangai:voice:${tgt}`);
+  };
+
+  // Translate on every meaningful change (debounced).
+  useEffect(() => {
+    const text = sourceText.trim();
+    if (!text) {
+      setTranslation(null);
+      setSummary(null);
+      return;
+    }
+    const id = setTimeout(() => doTranslate(text), 220);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceText, src, tgt]);
+
+  async function doTranslate(text: string) {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setTranslating(true);
+
+    async function call(providerId: string): Promise<TranslateResult> {
+      const r = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerId, q: text, src, tgt, freeMode }),
+        signal: ac.signal,
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      return data.result as TranslateResult;
+    }
+
+    try {
+      const chain = freeMode ? FREE_CHAIN : PAID_CHAIN;
+      let res: TranslateResult | null = null;
+      for (const provider of chain) {
+        res = await call(provider);
+        if (res?.primary && res.primary !== "—") break;
+      }
+      if (!res) res = { primary: "—", latencyMs: 0, fallback: true };
+      setTranslation(res);
+
+      // Auto-speak final translation when speaker has paused.
+      // Only speak if (a) the user is in a true pause (no interim),
+      // (b) the output is not just an extension of what we last spoke, and
+      // (c) at least 1.2s have elapsed since the last auto-speak.
+      if (autoSpeak && speech.interim.length === 0 && res.primary) {
+        const last = lastSpokenRef.current;
+        const next = res.primary;
+        const isExtension =
+          last && next.length >= last.length && next.startsWith(last);
+        const enoughDelta = Math.abs(next.length - last.length) > 4;
+        if (next !== last && (!isExtension || enoughDelta)) {
+          const now = Date.now();
+          if (now - lastSpeakAtRef.current > 1200) {
+            lastSpokenRef.current = next;
+            lastSpeakAtRef.current = now;
+            startSpeaking(next);
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setTranslation({ primary: "—", notes: (err as Error).message, latencyMs: 0, fallback: true });
+      }
+    } finally {
+      setTranslating(false);
+    }
+  }
+
+  // Restart recognition when source language changes mid-listening.
+  useEffect(() => {
+    if (speech.listening) {
+      speech.stop();
+      const id = setTimeout(() => speech.start(), 80);
+      return () => clearTimeout(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src]);
+
+  // 🔇 Anti-echo: while TTS is playing, suspend recognition so the mic
+  // does not pick up the device's own speaker and re-translate it.
+  useEffect(() => {
+    if (isSpeaking) pauseListening();
+    else resumeListening();
+  }, [isSpeaking, pauseListening, resumeListening]);
+
+  // When listening stops AND we have ≥500 translated words, fetch summary.
+  const lastListening = useRef(false);
+  useEffect(() => {
+    const wasListening = lastListening.current;
+    lastListening.current = speech.listening;
+    if (wasListening && !speech.listening) {
+      // Just stopped.
+      const final = translation?.primary;
+      if (!final || final === "—") return;
+      if (wordCount(final) < SUMMARY_THRESHOLD_WORDS) return;
+      void requestSummary(final);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.listening]);
+
+  async function requestSummary(text: string) {
+    setSummarizing(true);
+    try {
+      const r = await fetch("/api/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang: tgt }),
+      });
+      const data = await r.json();
+      if (data.summary) {
+        setSummary({ text: data.summary, provider: data.provider ?? "extractive", note: data.note });
+      }
+    } catch {
+      // silent — summary is a bonus, not critical
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
+  const startSpeaking = useCallback(
+    (text: string) => {
+      stopSpeaking();
+      speak(text, LANG_META[tgt].tts, {
+        voiceURI,
+        onStart: () => setIsSpeaking(true),
+        onEnd: () => setIsSpeaking(false),
+        onError: () => setIsSpeaking(false),
+      });
+    },
+    [tgt, voiceURI],
+  );
+
+  function toggleTts() {
+    if (isSpeaking) {
+      stopSpeaking();
+      setIsSpeaking(false);
+      return;
+    }
+    if (!translation?.primary || translation.primary === "—") return;
+    startSpeaking(translation.primary);
+  }
+
+  function clearAll() {
+    if (isSpeaking) stopSpeaking();
+    setIsSpeaking(false);
+    speech.reset();
+    setManualText("");
+    setTranslation(null);
+    setSummary(null);
+    lastSpokenRef.current = "";
+    lastSpeakAtRef.current = 0;
+  }
+
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      {/* Language bar + voice picker + auto-speak */}
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        <LanguageBar src={src} tgt={tgt} onChangeSrc={setSrc} onChangeTgt={setTgt} onSwap={onSwap} />
+        <div className="flex items-center gap-2">
+          {ttsSupported && voices.length > 0 && (
+            <VoicePicker
+              voices={voices}
+              value={voiceURI}
+              onChange={pickVoice}
+              tgt={tgt}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setAutoSpeak((v) => !v)}
+            disabled={!ttsSupported}
+            aria-pressed={autoSpeak}
+            title={ttsSupported ? "Speak the translation aloud automatically (use headphones to avoid feedback)" : "TTS not supported"}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              autoSpeak
+                ? "border-indigo-400 bg-indigo-500 text-white"
+                : "border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900"
+            } disabled:opacity-40`}
+          >
+            <SpeakerIcon className="h-3.5 w-3.5" />
+            auto-speak
+          </button>
+        </div>
+      </div>
+
+      {/* Source pane */}
+      <div className="relative flex-1 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4 shadow-sm min-h-[120px]">
+        <FlagLabel lang={src} />
+        {speech.liveText ? (
+          <p className="mt-2 text-2xl leading-snug font-medium">
+            {speech.finalText}
+            {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
+          </p>
+        ) : (
+          <textarea
+            value={manualText}
+            onChange={(e) => setManualText(e.target.value)}
+            placeholder={speech.listening ? "Listening…" : "Tap the mic or type here…"}
+            rows={2}
+            className="mt-2 block w-full resize-none bg-transparent text-2xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+          />
+        )}
+        {sourceText && (
+          <button
+            type="button"
+            onClick={clearAll}
+            aria-label="Clear"
+            className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Mic + Speak controls */}
+      <div className="flex items-center justify-center gap-6">
+        {/* Speaker / Stop-speaking button */}
+        <button
+          type="button"
+          onClick={toggleTts}
+          disabled={!ttsSupported || (!isSpeaking && (!translation?.primary || translation.primary === "—"))}
+          aria-label={isSpeaking ? "Stop speaking" : "Speak the translation"}
+          aria-pressed={isSpeaking}
+          className={`grid h-12 w-12 place-items-center rounded-full shadow-sm transition-colors disabled:opacity-40 ${
+            isSpeaking
+              ? "bg-gradient-to-br from-rose-500 to-rose-600 text-white"
+              : "bg-white text-current dark:bg-zinc-900 border border-black/10 dark:border-white/10 hover:border-indigo-400"
+          }`}
+        >
+          {isSpeaking ? <StopIcon className="h-5 w-5" /> : <SpeakerIcon className="h-5 w-5" />}
+        </button>
+
+        {/* Mic / Stop-listening button */}
+        <button
+          type="button"
+          onClick={speech.toggle}
+          disabled={!asrSupported}
+          aria-pressed={speech.listening}
+          aria-label={speech.listening ? "Stop listening" : "Start listening"}
+          className={`relative grid h-20 w-20 place-items-center rounded-full text-white shadow-lg transition-transform active:scale-95 ${
+            speech.listening
+              ? "bg-gradient-to-br from-rose-500 to-rose-600"
+              : "bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-rose-500"
+          } disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          {speech.listening && (
+            <span className="absolute inset-0 animate-ping rounded-full bg-rose-500/40" />
+          )}
+          {speech.listening ? <StopIcon className="h-9 w-9" /> : <MicIcon className="h-8 w-8" />}
+        </button>
+
+        {/* Clear button */}
+        <button
+          type="button"
+          onClick={clearAll}
+          aria-label="Clear all"
+          className="grid h-12 w-12 place-items-center rounded-full bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 shadow-sm hover:border-indigo-400 transition-colors"
+        >
+          <TrashIcon className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Translation pane */}
+      <div className="relative flex-1 rounded-2xl border border-black/10 dark:border-white/10 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-500/10 dark:to-zinc-900 p-4 shadow-sm min-h-[140px]">
+        <FlagLabel lang={tgt} loading={translating} />
+        {translation?.primary && translation.primary !== "—" ? (
+          <p className="mt-2 text-2xl leading-snug font-semibold">{translation.primary}</p>
+        ) : translating ? (
+          <div className="mt-3 space-y-2">
+            <div className="h-6 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+            <div className="h-5 w-1/2 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
+          </div>
+        ) : (
+          <p className="mt-2 text-2xl leading-snug text-zinc-400">…</p>
+        )}
+        {translation?.idiomatic?.note && (
+          <p className="mt-3 text-xs italic text-zinc-500">{translation.idiomatic.note}</p>
+        )}
+        {translation?.notes && translation.fallback && (
+          <p className="mt-3 text-[11px] text-zinc-400">{translation.notes}</p>
+        )}
+        {translation?.primary && translation.primary !== "—" && (
+          <p className="mt-2 text-[11px] text-zinc-400">
+            {wordCount(translation.primary)} words
+          </p>
+        )}
+      </div>
+
+      {/* Executive summary card */}
+      {(summary || summarizing) && (
+        <div className="rounded-2xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+              Executive summary
+            </h3>
+            {summary && (
+              <span className="text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">
+                {summary.provider === "llm" ? "Claude" : "heuristic"}
+              </span>
+            )}
+          </div>
+          {summarizing ? (
+            <div className="mt-3 space-y-2">
+              <div className="h-4 w-full animate-pulse rounded bg-amber-200/40 dark:bg-amber-500/10" />
+              <div className="h-4 w-5/6 animate-pulse rounded bg-amber-200/40 dark:bg-amber-500/10" />
+              <div className="h-4 w-3/4 animate-pulse rounded bg-amber-200/40 dark:bg-amber-500/10" />
+            </div>
+          ) : (
+            summary && (
+              <>
+                <p className="mt-2 text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+                  {summary.text}
+                </p>
+                {summary.note && (
+                  <p className="mt-2 text-[11px] italic text-amber-700/70 dark:text-amber-300/70">
+                    {summary.note}
+                  </p>
+                )}
+                {ttsSupported && (
+                  <button
+                    type="button"
+                    onClick={() => startSpeaking(summary.text)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+                  >
+                    <SpeakerIcon className="h-3 w-3" />
+                    speak summary
+                  </button>
+                )}
+              </>
+            )
+          )}
+        </div>
+      )}
+
+      {/* Status row */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
+        <span>
+          {asrSupported ? (
+            speech.listening ? (
+              <span className="text-rose-500">
+                ● listening in {LANG_META[src].name}… tap stop when done
+                {translation?.primary && translation.primary !== "—" && (
+                  <> · {wordCount(translation.primary)}/{SUMMARY_THRESHOLD_WORDS} words to summary</>
+                )}
+              </span>
+            ) : (
+              <>Tap mic to talk · ASR uses your browser, no audio leaves the device.</>
+            )
+          ) : isIos() ? (
+            "iOS: enable Siri & Dictation in Settings → General → Keyboard, then tap the mic."
+          ) : (
+            "Voice input not supported here — try Chrome, Edge, or Safari."
+          )}
+        </span>
+        {speech.error && <span className="text-rose-500">err: {speech.error}</span>}
+      </div>
+    </div>
+  );
+}
+
+function VoicePicker({
+  voices,
+  value,
+  onChange,
+  tgt,
+}: {
+  voices: SpeechSynthesisVoice[];
+  value: string | undefined;
+  onChange: (uri: string | undefined) => void;
+  tgt: Lang;
+}) {
+  // Sort: local voices first (higher quality on mobile), then alphabetical.
+  const sorted = [...voices].sort((a, b) => {
+    if (a.localService !== b.localService) return a.localService ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  return (
+    <label
+      className="flex items-center gap-1 rounded-full border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium shadow-sm"
+      title={`Pick a ${LANG_META[tgt].name} voice from your device`}
+    >
+      <SpeakerIcon className="h-3.5 w-3.5 opacity-70" />
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        aria-label={`${LANG_META[tgt].name} voice`}
+        className="max-w-[8rem] truncate bg-transparent pr-1 outline-none"
+      >
+        <option value="">Auto · {LANG_META[tgt].native}</option>
+        {sorted.map((v) => (
+          <option key={v.voiceURI} value={v.voiceURI}>
+            {v.name} {v.localService ? "(on-device)" : "(cloud)"}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function FlagLabel({ lang, loading }: { lang: Lang; loading?: boolean }) {
+  return (
+    <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+      <span className="text-base leading-none">{LANG_META[lang].flag}</span>
+      <span>{LANG_META[lang].native}</span>
+      {loading && (
+        <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
+      )}
+    </div>
+  );
+}
+
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" strokeWidth="2" />
+      <path d="M19 12a7 7 0 01-14 0M12 19v3M8 22h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StopIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <rect x="6" y="6" width="12" height="12" rx="2.5" />
+    </svg>
+  );
+}
+
+function SpeakerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M16 8a5 5 0 010 8M19 5a9 9 0 010 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 7h16M9 7V4h6v3m-7 0v13a2 2 0 002 2h4a2 2 0 002-2V7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

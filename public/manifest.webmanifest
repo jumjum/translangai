@@ -1,0 +1,17 @@
+{
+  "name": "TransLang AI — omni-translator",
+  "short_name": "TransLang",
+  "description": "Any-to-any dictionary & translator for EN · RU · DA · DE · SV. Voice in/out, multi-source compare, idiom-aware.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#6366f1",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon", "sizes": "32x32", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-icon", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
