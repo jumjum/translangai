@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.5)
+# TransLang AI — Design Specification (v0.6)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -258,8 +258,9 @@ The local provider is designed as **four tiers**, only Tier 1 + Tier 2 implement
 **v0.2** — Live voice mode, Swedish, free-by-default tier, MyMemory + LibreTranslate, server-side LRU cache, PWA manifest, iOS-ready, Vitest. ✅
 **v0.3** — Refactored row-based multilingual dictionary (~110 entries), tokenized word-by-word fallback so multi-word inputs **always** return something usable offline. ✅
 **v0.4** — Rebrand to **TransLang AI**, new gradient T→T logo, **voice picker** (lists device's installed voices per language, persisted), continuous-listening with explicit stop buttons (mic + speaker morph into red stop squares while active), **executive summary** on stop for ≥500-word translations (Claude when key set, deterministic extractive fallback otherwise), Lingva provider added (free Google proxy), better failure-state rendering in Compare panels, **anti-echo voice pipeline** (pause-during-TTS + iOS restart-delay + final-segment dedup + smarter auto-speak). ✅
-**v0.5 (this)** — **Portuguese (pt-BR)** added as 6th language — 30 directed pairs, full seed coverage (~110 entries), DeepL PT-BR code, ASR `pt-BR`, all free providers work natively. **Chrome Android incremental-final fix** — `lastFinalRef` replace-rather-than-append prevents cascading word duplication. ✅
-**v0.6** — Downloadable FreeDict / Wiktextract shards stored in IndexedDB (Tier 3). Per-pair "Get full offline dictionary" button. Language auto-detect. More providers (Reverso, Linguee, Wiktionary REST). History & pinned favorites.
+**v0.5** — **Portuguese (pt-BR)** added as 6th language — 30 directed pairs, full seed coverage (~110 entries), DeepL PT-BR code, ASR `pt-BR`, all free providers work natively. **Chrome Android incremental-final fix** — `lastFinalRef` replace-rather-than-append prevents cascading word duplication. ✅
+**v0.6 (this)** — **History sidebar** (ChatGPT-style fly-in left pane). Sessions ≥ 2 minutes auto-save with transcription + translation + executive summary; each row is one line with miniature `src→tgt` flag pair, timestamp, duration, and per-row delete. Click any row to restore the session into Live mode (no re-translate API call). Persisted to localStorage, cap 50 entries. ✅
+**v0.7** — Downloadable FreeDict / Wiktextract shards stored in IndexedDB (Tier 3). Per-pair "Get full offline dictionary" button. Language auto-detect. More providers (Reverso, Linguee, Wiktionary REST). Pinned favourites.
 **v1.0 (native)** — Tauri wrapper, global hotkey ⌘⇧D, macOS Services "Translate Selection".
 
 ---

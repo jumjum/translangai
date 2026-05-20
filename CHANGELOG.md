@@ -4,6 +4,20 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.6.0] — 2026-05-20
+
+### Added
+- 🗂️ **History sidebar** — a fly-in left pane (ChatGPT-style) lists every live-translation session that ran for **2 minutes or longer**. Each row is a single line showing the language pair as miniature flags (`🇬🇧→🇩🇪`), the timestamp ("Today 15:32" / "Yesterday 09:14" / "May 18 14:21"), the duration ("2m 14s"), and a per-row delete button. A "Clear all" button is offered when there's content; closes on Esc or backdrop click.
+- 💾 **Auto-save** on stop: when the user taps the stop button (or recognition ends naturally), if the mic was active ≥ 2 minutes, the session — source transcription + final translation + executive summary if generated — is persisted to localStorage (cap 50 entries, FIFO).
+- 🔁 **Click-to-restore**: tapping a history row opens that session in Live mode, hydrates the transcription / translation / summary panes, and switches the language pair to match. No re-translate API call is made for restored sessions (`skipNextTranslateRef`).
+
+### Technical
+- New `src/lib/history.ts` — `loadSessions`, `saveSession`, `updateSession`, `deleteSession`, `clearHistory`, plus `formatDuration` / `formatWhen` helpers. Reactivity via a `translangai:history` `CustomEvent` on `window` so any mounted panel stays in sync without prop drilling.
+- New `src/components/HistoryPanel.tsx` — slide-in panel, safe-area-inset aware, keyboard-accessible (Escape closes), backdrop blur.
+- `LiveTranslator` tracks session start (`sessionStartRef`) on listening transitions and patches the saved entry when the summary later arrives (`updateSession`).
+
+---
+
 ## [0.5.0] — 2026-05-20
 
 ### Added

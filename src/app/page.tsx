@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import LiveTranslator from "@/components/LiveTranslator";
 import CompareView from "@/components/CompareView";
+import HistoryPanel from "@/components/HistoryPanel";
+import type { Session } from "@/lib/history";
 import type { Lang } from "@/lib/types";
 
 type Mode = "live" | "compare";
@@ -13,6 +15,10 @@ export default function Home() {
   const [tgt, setTgt] = useState<Lang>("da");
   /** Free mode is ON by default — friendly to first-time visitors + safe for the deployer. */
   const [freeMode, setFreeMode] = useState(true);
+
+  // History sidebar
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [loadedSession, setLoadedSession] = useState<Session | null>(null);
 
   // Persist shared state across reloads.
   useEffect(() => {
@@ -47,7 +53,18 @@ export default function Home() {
       }}
     >
       <header className="flex items-center justify-between gap-3">
-        <Logo />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="Open history"
+            title="History"
+            className="grid h-9 w-9 place-items-center rounded-xl border border-black/10 bg-white shadow-sm transition-colors hover:border-indigo-400 dark:border-white/10 dark:bg-zinc-900"
+          >
+            <HistoryIcon className="h-4 w-4" />
+          </button>
+          <Logo />
+        </div>
         <div className="flex items-center gap-2">
           <FreeModeChip freeMode={freeMode} setFreeMode={setFreeMode} />
           <ModeSwitch mode={mode} setMode={setMode} />
@@ -55,7 +72,16 @@ export default function Home() {
       </header>
 
       {mode === "live" ? (
-        <LiveTranslator src={src} tgt={tgt} setSrc={setSrc} setTgt={setTgt} onSwap={swap} freeMode={freeMode} />
+        <LiveTranslator
+          src={src}
+          tgt={tgt}
+          setSrc={setSrc}
+          setTgt={setTgt}
+          onSwap={swap}
+          freeMode={freeMode}
+          loadedSession={loadedSession}
+          onSessionLoaded={() => setLoadedSession(null)}
+        />
       ) : (
         <CompareView src={src} tgt={tgt} setSrc={setSrc} setTgt={setTgt} onSwap={swap} freeMode={freeMode} />
       )}
@@ -63,7 +89,26 @@ export default function Home() {
       <footer className="pt-2 text-center text-[11px] text-zinc-400">
         MVP · web + mobile · voice in/out via Web Speech API · native macOS coming soon
       </footer>
+
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onLoad={(s) => {
+          setMode("live"); // history rows always restore into Live mode
+          setLoadedSession(s);
+        }}
+      />
     </main>
+  );
+}
+
+function HistoryIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 12a9 9 0 109-9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M3 4v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import LanguageBar from "@/components/LanguageBar";
+import { saveSession, updateSession, type Session } from "@/lib/history";
 import {
   isIos,
   isSpeechRecognitionSupported,
@@ -20,7 +21,13 @@ type Props = {
   setTgt: (l: Lang) => void;
   onSwap: () => void;
   freeMode: boolean;
+  /** A history entry the user wants to view. Populated then acked via onSessionLoaded. */
+  loadedSession?: Session | null;
+  onSessionLoaded?: () => void;
 };
+
+/** Sessions ≥ this many ms are auto-saved to history on stop. */
+const HISTORY_MIN_MS = 120_000; // 2 minutes
 
 /** Free chain — used while free mode is on. */
 const FREE_CHAIN = ["mymemory", "lingva", "libre", "local"] as const;
@@ -33,7 +40,16 @@ function wordCount(s: string): number {
   return s.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export default function LiveTranslator({ src, tgt, setSrc, setTgt, onSwap, freeMode }: Props) {
+export default function LiveTranslator({
+  src,
+  tgt,
+  setSrc,
+  setTgt,
+  onSwap,
+  freeMode,
+  loadedSession,
+  onSessionLoaded,
+}: Props) {
   const speech = useSpeechRecognition(LANG_META[src].bcp47);
   const { pause: pauseListening, resume: resumeListening } = speech;
   const [translation, setTranslation] = useState<TranslateResult | null>(null);
@@ -53,6 +69,12 @@ export default function LiveTranslator({ src, tgt, setSrc, setTgt, onSwap, freeM
   const lastSpokenRef = useRef("");
   const lastSpeakAtRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  // History session tracking — wall-clock from mic-start to stop.
+  const sessionStartRef = useRef<number | null>(null);
+  const savedSessionIdRef = useRef<string | null>(null);
+  // When loading a session from history, suppress the next auto-translate.
+  const skipNextTranslateRef = useRef(false);
 
   const ttsSupported = isTtsSupported();
   const asrSupported = isSpeechRecognitionSupported();
@@ -86,6 +108,12 @@ export default function LiveTranslator({ src, tgt, setSrc, setTgt, onSwap, freeM
     if (!text) {
       setTranslation(null);
       setSummary(null);
+      return;
+    }
+    // When restoring a session from history, the translation is already known —
+    // don't re-call the API.
+    if (skipNextTranslateRef.current) {
+      skipNextTranslateRef.current = false;
       return;
     }
     const id = setTimeout(() => doTranslate(text), 220);
@@ -166,20 +194,89 @@ export default function LiveTranslator({ src, tgt, setSrc, setTgt, onSwap, freeM
     else resumeListening();
   }, [isSpeaking, pauseListening, resumeListening]);
 
-  // When listening stops AND we have ≥500 translated words, fetch summary.
+  // Track listening transitions for: (1) session timing, (2) summary, (3) history save.
   const lastListening = useRef(false);
   useEffect(() => {
     const wasListening = lastListening.current;
     lastListening.current = speech.listening;
+
+    // Just started — mark session start time.
+    if (!wasListening && speech.listening) {
+      sessionStartRef.current = Date.now();
+      savedSessionIdRef.current = null;
+    }
+
+    // Just stopped.
     if (wasListening && !speech.listening) {
-      // Just stopped.
+      const startedAt = sessionStartRef.current;
+      sessionStartRef.current = null;
+      const duration = startedAt ? Date.now() - startedAt : 0;
+
+      // (1) Save to history if it was a real session (≥ 2 minutes).
+      if (startedAt && duration >= HISTORY_MIN_MS) {
+        const id = saveSession({
+          createdAt: startedAt,
+          durationMs: duration,
+          src,
+          tgt,
+          transcription: speech.finalText.trim(),
+          translation: translation?.primary && translation.primary !== "—" ? translation.primary : "",
+        });
+        savedSessionIdRef.current = id;
+      }
+
+      // (2) Summary for long translations (independent of history threshold).
       const final = translation?.primary;
-      if (!final || final === "—") return;
-      if (wordCount(final) < SUMMARY_THRESHOLD_WORDS) return;
-      void requestSummary(final);
+      if (final && final !== "—" && wordCount(final) >= SUMMARY_THRESHOLD_WORDS) {
+        void requestSummary(final);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speech.listening]);
+
+  // When the summary arrives, patch the saved history entry (if any).
+  useEffect(() => {
+    if (!summary || !savedSessionIdRef.current) return;
+    updateSession(savedSessionIdRef.current, {
+      summary: summary.text,
+      summaryProvider: summary.provider === "llm" ? "llm" : "extractive",
+    });
+  }, [summary]);
+
+  // ─── Load a saved session from history ─────────────────────────────────────
+  // When the user clicks a row in the HistoryPanel, the parent passes the
+  // session in via `loadedSession`. Hydrate UI from it and skip auto-translate.
+  useEffect(() => {
+    if (!loadedSession) return;
+    // Stop any active listening / speaking.
+    if (speech.listening) speech.stop();
+    stopSpeaking();
+    setIsSpeaking(false);
+
+    // Sync language pair at the parent level if it differs.
+    if (loadedSession.src !== src) setSrc(loadedSession.src);
+    if (loadedSession.tgt !== tgt) setTgt(loadedSession.tgt);
+
+    // Clear live recogniser state, then hydrate as manual text.
+    speech.reset();
+    skipNextTranslateRef.current = true;
+    setManualText(loadedSession.transcription);
+    setTranslation({
+      primary: loadedSession.translation || "—",
+      latencyMs: 0,
+      fallback: !loadedSession.translation,
+    });
+    setSummary(
+      loadedSession.summary
+        ? { text: loadedSession.summary, provider: loadedSession.summaryProvider ?? "extractive" }
+        : null,
+    );
+    // Don't accidentally update *this* session as if a new one — clear the saved-id.
+    savedSessionIdRef.current = null;
+
+    onSessionLoaded?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedSession]);
 
   async function requestSummary(text: string) {
     setSummarizing(true);
@@ -232,6 +329,8 @@ export default function LiveTranslator({ src, tgt, setSrc, setTgt, onSwap, freeM
     setSummary(null);
     lastSpokenRef.current = "";
     lastSpeakAtRef.current = 0;
+    sessionStartRef.current = null;
+    savedSessionIdRef.current = null;
   }
 
   return (
