@@ -20,6 +20,10 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadedSession, setLoadedSession] = useState<Session | null>(null);
 
+  // Shared source text — persists across Live ↔ Compare toggles so the user
+  // can flip to Compare to see what other engines say about the same input.
+  const [sharedText, setSharedText] = useState("");
+
   // Persist shared state across reloads.
   useEffect(() => {
     try {
@@ -81,9 +85,20 @@ export default function Home() {
           freeMode={freeMode}
           loadedSession={loadedSession}
           onSessionLoaded={() => setLoadedSession(null)}
+          text={sharedText}
+          setText={setSharedText}
         />
       ) : (
-        <CompareView src={src} tgt={tgt} setSrc={setSrc} setTgt={setTgt} onSwap={swap} freeMode={freeMode} />
+        <CompareView
+          src={src}
+          tgt={tgt}
+          setSrc={setSrc}
+          setTgt={setTgt}
+          onSwap={swap}
+          freeMode={freeMode}
+          text={sharedText}
+          setText={setSharedText}
+        />
       )}
 
       <footer className="pt-2 text-center text-[11px] text-zinc-400">

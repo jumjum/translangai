@@ -21,10 +21,14 @@ type Props = {
   setTgt: (l: Lang) => void;
   onSwap: () => void;
   freeMode: boolean;
+  /** Shared source text — lifted to page-level so it survives mode toggles. */
+  text: string;
+  setText: (s: string) => void;
 };
 
-export default function CompareView({ src, tgt, setSrc, setTgt, onSwap, freeMode }: Props) {
-  const [q, setQ] = useState("");
+export default function CompareView({ src, tgt, setSrc, setTgt, onSwap, freeMode, text, setText }: Props) {
+  const q = text;
+  const setQ = setText;
   const [slots, setSlots] = useState<ProviderId[]>(DEFAULT_SLOTS);
   const [states, setStates] = useState<Record<ProviderId, SlotState>>(() => ({
     deepl: EMPTY_SLOT,

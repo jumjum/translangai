@@ -24,6 +24,9 @@ type Props = {
   /** A history entry the user wants to view. Populated then acked via onSessionLoaded. */
   loadedSession?: Session | null;
   onSessionLoaded?: () => void;
+  /** Shared source text — lifted to page-level so it survives Live ↔ Compare toggles. */
+  text: string;
+  setText: (s: string) => void;
 };
 
 /** Sessions ≥ this many ms are auto-saved to history on stop. */
@@ -49,6 +52,8 @@ export default function LiveTranslator({
   freeMode,
   loadedSession,
   onSessionLoaded,
+  text,
+  setText,
 }: Props) {
   const speech = useSpeechRecognition(LANG_META[src].bcp47);
   const { pause: pauseListening, resume: resumeListening } = speech;
@@ -56,7 +61,6 @@ export default function LiveTranslator({
   const [translating, setTranslating] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [manualText, setManualText] = useState("");
 
   // Voice picker
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -79,8 +83,17 @@ export default function LiveTranslator({
   const ttsSupported = isTtsSupported();
   const asrSupported = isSpeechRecognitionSupported();
 
-  // Use either live speech or manual input.
-  const sourceText = speech.liveText || manualText;
+  // While listening, the live recogniser is the source of truth; otherwise the
+  // shared text (page-level state, survives Live ↔ Compare toggles) is.
+  const sourceText = speech.listening ? speech.liveText : text;
+
+  // Mirror committed speech (finalText) into the shared text so when the user
+  // switches to Compare mid-session, they keep what's been heard so far.
+  useEffect(() => {
+    if (!speech.listening) return;
+    if (speech.finalText && speech.finalText !== text) setText(speech.finalText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.finalText, speech.listening]);
 
   // Refresh voice list when the target language changes.
   useEffect(() => {
@@ -257,10 +270,10 @@ export default function LiveTranslator({
     if (loadedSession.src !== src) setSrc(loadedSession.src);
     if (loadedSession.tgt !== tgt) setTgt(loadedSession.tgt);
 
-    // Clear live recogniser state, then hydrate as manual text.
+    // Clear live recogniser state, then hydrate the shared text.
     speech.reset();
     skipNextTranslateRef.current = true;
-    setManualText(loadedSession.transcription);
+    setText(loadedSession.transcription);
     setTranslation({
       primary: loadedSession.translation || "—",
       latencyMs: 0,
@@ -324,7 +337,7 @@ export default function LiveTranslator({
     if (isSpeaking) stopSpeaking();
     setIsSpeaking(false);
     speech.reset();
-    setManualText("");
+    setText("");
     setTranslation(null);
     setSummary(null);
     lastSpokenRef.current = "";
@@ -368,16 +381,16 @@ export default function LiveTranslator({
       {/* Source pane */}
       <div className="relative flex-1 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4 shadow-sm min-h-[120px]">
         <FlagLabel lang={src} />
-        {speech.liveText ? (
+        {speech.listening ? (
           <p className="mt-2 text-2xl leading-snug font-medium">
             {speech.finalText}
             {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
           </p>
         ) : (
           <textarea
-            value={manualText}
-            onChange={(e) => setManualText(e.target.value)}
-            placeholder={speech.listening ? "Listening…" : "Tap the mic or type here…"}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={"Tap the mic or type here…"}
             rows={2}
             className="mt-2 block w-full resize-none bg-transparent text-2xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
           />

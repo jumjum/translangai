@@ -4,6 +4,14 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.6.1] — 2026-05-20
+
+### Changed
+- 🔁 **Persistent source text across Live ↔ Compare** — the input is now lifted to page-level shared state, so typing in Compare and switching to Live (or speaking in Live and switching to Compare) keeps the text. Lets you instantly explore what 4 different engines say about the same phrase you just spoke.
+- During listening, the committed `speech.finalText` is mirrored into the shared text on every update — so a flip to Compare mid-session still picks up everything heard so far.
+
+---
+
 ## [0.6.0] — 2026-05-20
 
 ### Added
