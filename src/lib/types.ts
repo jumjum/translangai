@@ -1,17 +1,18 @@
 // Core domain types — referenced everywhere.
 
-export const LANGS = ["en", "ru", "da", "de", "sv"] as const;
+export const LANGS = ["en", "ru", "da", "de", "sv", "pt"] as const;
 export type Lang = (typeof LANGS)[number];
 
 export const LANG_META: Record<
   Lang,
   { name: string; native: string; flag: string; bcp47: string; tts: string }
 > = {
-  en: { name: "English", native: "English", flag: "🇬🇧", bcp47: "en-US", tts: "en-US" },
-  ru: { name: "Russian", native: "Русский", flag: "🇷🇺", bcp47: "ru-RU", tts: "ru-RU" },
-  da: { name: "Danish",  native: "Dansk",    flag: "🇩🇰", bcp47: "da-DK", tts: "da-DK" },
-  de: { name: "German",  native: "Deutsch",  flag: "🇩🇪", bcp47: "de-DE", tts: "de-DE" },
-  sv: { name: "Swedish", native: "Svenska",  flag: "🇸🇪", bcp47: "sv-SE", tts: "sv-SE" },
+  en: { name: "English",    native: "English",    flag: "🇬🇧", bcp47: "en-US", tts: "en-US" },
+  ru: { name: "Russian",    native: "Русский",    flag: "🇷🇺", bcp47: "ru-RU", tts: "ru-RU" },
+  da: { name: "Danish",     native: "Dansk",      flag: "🇩🇰", bcp47: "da-DK", tts: "da-DK" },
+  de: { name: "German",     native: "Deutsch",    flag: "🇩🇪", bcp47: "de-DE", tts: "de-DE" },
+  sv: { name: "Swedish",    native: "Svenska",    flag: "🇸🇪", bcp47: "sv-SE", tts: "sv-SE" },
+  pt: { name: "Portuguese", native: "Português",  flag: "🇧🇷", bcp47: "pt-BR", tts: "pt-BR" },
 };
 
 export type TranslateRequest = {

@@ -4,6 +4,19 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.5.0] — 2026-05-20
+
+### Added
+- 🇧🇷 **Portuguese (pt-BR)** — 6th language, bringing the app to **30 directed pairs**. Full seed-dictionary coverage (~110 entries): greetings, pronouns, verbs, nouns, adjectives, numbers, wh-words, prepositions, conjunctions, time words, and 4 idioms (idiomatic equivalents, not literal translations). Voice input (`pt-BR` BCP-47) and TTS output work on Android Chrome and iOS Safari. All 4 free providers (local, MyMemory, LibreTranslate, Lingva) support Portuguese natively with no extra config. DeepL uses the `PT-BR` code.
+
+### Fixed
+- 🤖 **Chrome Android incremental-final transcript stutter** — Chrome fires `isFinal=true` multiple times per utterance with a cumulative transcript ("I don't" → "I don't want" → "I don't want any"). Without handling, each chunk appended, producing "I don't I don't want I don't want any…". Fix: new `lastFinalRef` tracks the last appended segment; if the next final starts with it (Chrome's growing-transcript pattern), the tail is **replaced** rather than appended. `lastFinalRef` resets on every `onstart` so phrases across session restarts are never incorrectly merged. The existing iOS tail-dedup is kept for exact double-fire protection.
+
+### Tests
+- 43 passing (5 files) — all existing tests pass; Portuguese is exercised by the seed + providers suites.
+
+---
+
 ## [0.4.0] — 2026-05-20
 
 ### Added

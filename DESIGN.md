@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.4)
+# TransLang AI — Design Specification (v0.5)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -7,7 +7,7 @@
 ## 1. Product Goals
 
 1. **Faster + smarter than Google Translate / TranSync** for everyday lookups.
-2. **Any-to-any** between **English, Russian, Danish, German, Swedish** from day one (20 directed pairs).
+2. **Any-to-any** between **English, Russian, Danish, German, Swedish, Portuguese** from day one (30 directed pairs).
 3. **Words, phrases, idioms, figures of speech** — idioms map to *local equivalents*, not literal translations.
 4. **Multi-source parallel view** — see what 4 different engines say at once.
 5. **Voice in + voice out** — speak in any supported language, see live transcription, hear the translation spoken back.
@@ -20,7 +20,7 @@
 
 - Document translation, OCR — later.
 - Accounts / cloud sync — local storage only for v0.x.
-- Languages outside EN / RU / DA / DE / SV.
+- Languages outside EN / RU / DA / DE / SV / PT.
 
 ---
 
@@ -157,11 +157,11 @@ UI affordance for the user: the auto-speak toggle's tooltip notes "use headphone
 |---|---|---|---|---|
 | **Layout / safe-area** | ✅ | ✅ (notch handled) | ✅ | `viewport-fit=cover`, `min-h-dvh`, `safe-area-inset-*`. |
 | **PWA install** | ✅ A2HS | ✅ A2HS via Share sheet | ✅ install icon | Web manifest + `apple-icon.tsx` shipped. |
-| **SpeechRecognition (ASR)** | ✅ native | ✅ (Siri Dictation must be enabled) | ✅ | iOS auto-ends after pause → we restart on `onend` while user intent is "listening". |
+| **SpeechRecognition (ASR)** | ✅ native | ✅ (Siri Dictation must be enabled) | ✅ | iOS auto-ends after pause → we restart on `onend` while user intent is "listening". Chrome Android fires incremental finals — handled via `lastFinalRef` replace-rather-than-append. |
 | **speechSynthesis (TTS)** | ✅ | ✅ (voices load async) | ✅ | We wait on the `voiceschanged` event before picking a voice. |
 | **Microphone permission** | https only | https only | https only | Vercel preview/production URLs are https. |
 | **Dark mode** | ✅ system | ✅ system | ✅ system | `prefers-color-scheme` in CSS. |
-| **Localized recognition** | en-US / ru-RU / da-DK / de-DE / sv-SE | same | same | Languages stored as BCP-47 in `LANG_META`. |
+| **Localized recognition** | en-US / ru-RU / da-DK / de-DE / sv-SE / pt-BR | same | same | Languages stored as BCP-47 in `LANG_META`. |
 
 **iOS Safari testing tips:**
 - Open https URL on the device → tap mic → grant mic permission once.
@@ -192,7 +192,7 @@ UI affordance for the user: the auto-speak toggle's tooltip notes "use headphone
 
 ## 9. Tests
 
-Run with `npm test`. Suite (25 tests, 4 files):
+Run with `npm test`. Suite (43 tests, 5 files):
 
 - `seed.test.ts` (7) — seed dictionary covers all 5 langs, case-insensitive, idiom flags set, misses return null, example sentences hydrate.
 - `cache.test.ts` (4) — LRU eviction, TTL expiry, clear.
@@ -234,7 +234,7 @@ The local provider is designed as **four tiers**, only Tier 1 + Tier 2 implement
 
 | Tier | Source | Status | Size | Notes |
 |---|---|---|---|---|
-| **1 — Bundled rows** | `src/lib/data/seed.ts` | ✅ done | ~110 rows × 5 langs | One JS file. Greetings, pronouns, verbs, nouns, adjectives, numbers, prepositions, time, idioms. Aliases supported. |
+| **1 — Bundled rows** | `src/lib/data/seed.ts` | ✅ done | ~110 rows × 6 langs | One JS file. Greetings, pronouns, verbs, nouns, adjectives, numbers, prepositions, time, idioms. Aliases supported. |
 | **2 — Tokenized fallback** | same data | ✅ done | — | Splits on whitespace + punctuation, word-by-word lookup, passes unknown words through, drops intentionally-empty target forms (e.g. RU articles). |
 | **3 — IndexedDB bulk dict** | Downloadable JSON shard, persisted client-side | planned | ~10–50 MB / pair | User taps "Get full EN-SV dictionary". Stored in IndexedDB. The provider checks client cache first via SWR. |
 | **4 — Server SQLite** | FreeDict / Wiktextract dump | planned | ~200 MB | `better-sqlite3` behind `/api/translate?provider=local`. Lets phones stay light while still hitting a rich dictionary. |
@@ -256,10 +256,10 @@ The local provider is designed as **four tiers**, only Tier 1 + Tier 2 implement
 
 **v0.1** — 4-pane lookup, EN/DA/DE/RU, 4 providers wired. ✅
 **v0.2** — Live voice mode, Swedish, free-by-default tier, MyMemory + LibreTranslate, server-side LRU cache, PWA manifest, iOS-ready, Vitest. ✅
-**v0.3 (this)** — Refactored row-based multilingual dictionary (~110 entries), tokenized word-by-word fallback so multi-word inputs **always** return something usable offline. ✅
-**v0.4 (this)** — Rebrand to **TransLang AI**, new gradient T→T logo, **voice picker** (lists device's installed voices per language, persisted), continuous-listening with explicit stop buttons (mic + speaker morph into red stop squares while active), **executive summary** on stop for ≥500-word translations (Claude when key set, deterministic extractive fallback otherwise), Lingva provider added (free Google proxy), better failure-state rendering in Compare panels, **anti-echo voice pipeline** (pause-during-TTS + iOS restart-delay + final-segment dedup + smarter auto-speak). ✅
-**v0.5** — Downloadable FreeDict / Wiktextract shards stored in IndexedDB (Tier 3). Per-pair "Get full offline dictionary" button. Language auto-detect. History & pinned favorites.
-**v0.6** — More online providers (Reverso, Linguee, Wiktionary REST, InfoDanish, Duden, Gramota), macOS Dictionary via Tauri.
+**v0.3** — Refactored row-based multilingual dictionary (~110 entries), tokenized word-by-word fallback so multi-word inputs **always** return something usable offline. ✅
+**v0.4** — Rebrand to **TransLang AI**, new gradient T→T logo, **voice picker** (lists device's installed voices per language, persisted), continuous-listening with explicit stop buttons (mic + speaker morph into red stop squares while active), **executive summary** on stop for ≥500-word translations (Claude when key set, deterministic extractive fallback otherwise), Lingva provider added (free Google proxy), better failure-state rendering in Compare panels, **anti-echo voice pipeline** (pause-during-TTS + iOS restart-delay + final-segment dedup + smarter auto-speak). ✅
+**v0.5 (this)** — **Portuguese (pt-BR)** added as 6th language — 30 directed pairs, full seed coverage (~110 entries), DeepL PT-BR code, ASR `pt-BR`, all free providers work natively. **Chrome Android incremental-final fix** — `lastFinalRef` replace-rather-than-append prevents cascading word duplication. ✅
+**v0.6** — Downloadable FreeDict / Wiktextract shards stored in IndexedDB (Tier 3). Per-pair "Get full offline dictionary" button. Language auto-detect. More providers (Reverso, Linguee, Wiktionary REST). History & pinned favorites.
 **v1.0 (native)** — Tauri wrapper, global hotkey ⌘⇧D, macOS Services "Translate Selection".
 
 ---
