@@ -20,13 +20,13 @@ export default function AppleIcon() {
         }}
       >
         <svg width="128" height="128" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-          <circle cx="32" cy="32" r="2.6" fill="#fafafa" />
-          <line x1="8" y1="32" x2="18" y2="32" stroke="#fafafa" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-          <line x1="46" y1="32" x2="56" y2="32" stroke="#fafafa" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
-          <circle cx="8" cy="32" r="1.5" fill="#fafafa" />
-          <circle cx="56" cy="32" r="1.5" fill="#fafafa" />
+          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="3.4" fill="none" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="3.4" fill="#fafafa" />
+          <line x1="8" y1="32" x2="18" y2="32" stroke="#fafafa" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+          <line x1="46" y1="32" x2="56" y2="32" stroke="#fafafa" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+          <circle cx="8" cy="32" r="2" fill="#fafafa" />
+          <circle cx="56" cy="32" r="2" fill="#fafafa" />
         </svg>
       </div>
     ),

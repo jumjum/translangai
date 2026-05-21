@@ -4,6 +4,25 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.9.0] — 2026-05-21
+
+### Added
+- 🇵🇱 **Polish (pl)** as the 7th language — 42 directed pairs. Full seed coverage including idioms (`bułka z masłem` for "piece of cake", `połamania nóg` for "break a leg"). DeepL `PL`, MyMemory `pl`, ASR/TTS `pl-PL`. All free providers work natively.
+- **Editable source in Pairs and Stream views** — previously read-only. Both views now expose an auto-growing textarea so the user can type or paste regardless of which view is active.
+- **Synchronized scroll in Stream view** — single container with two independently-scrolling halves separated by a thin rule. Scrolling either pane drives the other proportionally so the matching translation segment stays in view. Re-entry guard prevents echo. Sticks to the bottom on new content unless the user has scrolled away.
+
+### Changed
+- **Logo strokes / dots ~30% larger** so the Culture-glyph stays legible at favicon size. Applied to `public/icon.svg`, `public/icon-maskable.svg`, the dynamic `icon.tsx` / `apple-icon.tsx`, and the header `Logo` component.
+- **Pairs view layout**: mic cluster is now horizontally centered (was left-aligned). The right-anchored flag-pair label was dropped — the language bar already shows it.
+- **Source pane no longer shrinks on mic toggle** in Split / Pairs / Stream — wrapped in a `min-h-[4.5rem]` container so the `<p>` (live transcript) and `<textarea>` (manual input) both occupy the same minimum height.
+- **Target placeholder copy** — replaced the bare `…` with "Translation will appear here…" in all three views.
+- **`lang` attribute** set on every source textarea (`en-US`, `ru-RU`, `pl-PL`, etc.). This is a hint to the OS dictation / spellcheck / autocorrect layer — iOS Safari respects it for the dictation engine, Chrome respects it for spellcheck. **It does not switch the OS keyboard layout** — web pages cannot do that on any platform; only native shells (Tauri / RN) can. Roadmap item for v1.0.
+
+### Removed
+- The unused `FlagPair` component (replaced by the language bar itself).
+
+---
+
 ## [0.8.1] — 2026-05-21
 
 ### Added

@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.8)
+# TransLang AI — Design Specification (v0.9)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -7,7 +7,7 @@
 ## 1. Product Goals
 
 1. **Faster + smarter than Google Translate / TranSync** for everyday lookups.
-2. **Any-to-any** between **English, Russian, Danish, German, Swedish, Portuguese** from day one (30 directed pairs).
+2. **Any-to-any** between **English, Russian, Danish, German, Swedish, Portuguese, Polish** from day one (42 directed pairs).
 3. **Words, phrases, idioms, figures of speech** — idioms map to *local equivalents*, not literal translations.
 4. **Multi-source parallel view** — see what 4 different engines say at once.
 5. **Voice in + voice out** — speak in any supported language, see live transcription, hear the translation spoken back.
@@ -20,7 +20,7 @@
 
 - Document translation, OCR — later.
 - Accounts / cloud sync — local storage only for v0.x.
-- Languages outside EN / RU / DA / DE / SV / PT.
+- Languages outside EN / RU / DA / DE / SV / PT / PL.
 
 ---
 
@@ -330,7 +330,7 @@ Three layouts toggle via a segmented pill in the toolbar. Choice is persisted pe
 |---|---|---|
 | **Split** (default) | Single thought / a few sentences. The mental model most users come in with. | Source pane (content-sized, auto-grows) → mic+speaker+clear cluster → translation pane (content-sized). Page scrolls; panes never collapse on blur. |
 | **Pairs** (Paragraph) | Long monologue you'll re-read later. | One scrollable column. Source sentence-split into ~25-word paragraphs; each paragraph rendered with a thin rule below it then the matching translated paragraph. Sticky-bottom auto-scroll. Mic cluster at top. |
-| **Stream** | Live interpretation while you talk continuously. | Two stacked fixed-height panes (28dvh each); both auto-scroll so the most-recent source line and most-recent translation line are always at the bottom of their pane. |
+| **Stream** | Live interpretation while you talk continuously. | **Single container** with two independently-scrolling halves separated by a thin rule. Scrolling one half drives the other proportionally so the matching translation segment stays in view (re-entry guard prevents echo). Sticks to the bottom on new content unless the user scrolled away. Top half has an editable textarea when not listening, live transcript when listening. |
 | **Columns** (planned) | Tablet / desktop landscape, side-by-side proofreading. | Source on left, target on right, both scroll. |
 
 ### Segmenting
@@ -340,6 +340,10 @@ For Pairs view we don't make per-paragraph translation calls. Instead we sentenc
 ### Sticky-bottom scrolling
 
 `useStickyBottom(dep)` in `src/lib/segmenter.ts`. Tracks whether the container is within 24px of its bottom; if yes, content growth scrolls to bottom automatically. If the user scrolls up to read older content the auto-scroll yields — scrolling back down re-engages it.
+
+### Per-textarea `lang` attribute (OS dictation hint)
+
+Every source textarea declares `lang={LANG_META[src].bcp47}` (e.g. `lang="pl-PL"`). This is a hint to the browser / OS for **dictation, spellcheck, autocorrect, and autocapitalization** — Safari iOS respects it when you tap the microphone key on the system keyboard, Chrome respects it for spellcheck underlines. It **does not switch the OS keyboard layout** — web pages have no permission to do that on any platform. True keyboard-layout switching is reserved for the native shells (Tauri on desktop, eventually Tauri-mobile or React Native), which can call OS APIs.
 
 ### Source pane no-collapse fix
 

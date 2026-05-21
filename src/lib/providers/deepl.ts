@@ -10,6 +10,7 @@ const DEEPL_CODE: Record<Lang, string> = {
   de: "DE",
   sv: "SV",
   pt: "PT-BR",
+  pl: "PL",
 };
 
 export const deeplProvider: TranslationProvider = {

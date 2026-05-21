@@ -66,6 +66,6 @@ export const mymemoryProvider: TranslationProvider = {
   },
 };
 
-// Lang-code mapping is identity for our 6 langs — MyMemory uses ISO 639-1.
+// Lang-code mapping is identity for our 7 langs — MyMemory uses ISO 639-1.
 // Exported so tests can verify supported pairs.
-export const MYMEMORY_LANGS: Lang[] = ["en", "ru", "da", "de", "sv", "pt"];
+export const MYMEMORY_LANGS: Lang[] = ["en", "ru", "da", "de", "sv", "pt", "pl"];

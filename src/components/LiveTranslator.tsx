@@ -423,24 +423,32 @@ export default function LiveTranslator({
     </div>
   );
 
-  // ── Source field — used by Split view; auto-grows with content ────────────
-  const sourceField = speech.listening ? (
-    <p className="text-2xl leading-snug font-medium">
-      {speech.finalText}
-      {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
-      {!speech.finalText && !speech.interim && (
-        <span className="text-zinc-400">Listening…</span>
+  // ── Source field — used by Split view ─────────────────────────────────────
+  // Wrapped in a min-height container so toggling between the live transcript
+  // <p> and the editable <textarea> doesn't visually shrink the source pane.
+  const sourceField = (
+    <div className="min-h-[4.5rem]">
+      {speech.listening ? (
+        <p className="text-2xl leading-snug font-medium">
+          {speech.finalText}
+          {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
+          {!speech.finalText && !speech.interim && (
+            <span className="text-zinc-400">Listening…</span>
+          )}
+        </p>
+      ) : (
+        <textarea
+          ref={taRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Tap the mic or type here…"
+          rows={2}
+          lang={LANG_META[src].bcp47}
+          spellCheck
+          className="block w-full resize-none bg-transparent text-2xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+        />
       )}
-    </p>
-  ) : (
-    <textarea
-      ref={taRef}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      placeholder="Tap the mic or type here…"
-      rows={2}
-      className="block w-full resize-none bg-transparent text-2xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
-    />
+    </div>
   );
 
   const targetField =
@@ -452,7 +460,7 @@ export default function LiveTranslator({
         <div className="h-5 w-1/2 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
       </div>
     ) : (
-      <p className="text-2xl leading-snug text-zinc-400">…</p>
+      <p className="text-xl leading-snug text-zinc-400">Translation will appear here…</p>
     );
 
   return (
@@ -529,9 +537,12 @@ export default function LiveTranslator({
         <ParagraphLayout
           src={src}
           tgt={tgt}
+          text={text}
+          setText={setText}
           sourceText={sourceText}
           tgtText={tgtText}
           interim={speech.listening ? speech.interim : ""}
+          isListening={speech.listening}
           translating={translating}
           controls={controlCluster}
         />
@@ -541,9 +552,12 @@ export default function LiveTranslator({
         <StreamLayout
           src={src}
           tgt={tgt}
+          text={text}
+          setText={setText}
           sourceText={sourceText}
           tgtText={tgtText}
           interim={speech.listening ? speech.interim : ""}
+          isListening={speech.listening}
           translating={translating}
           controls={controlCluster}
         />
@@ -699,17 +713,23 @@ function ViewSwitcher({ view, setView }: { view: View; setView: (v: View) => voi
 function ParagraphLayout({
   src,
   tgt,
+  text,
+  setText,
   sourceText,
   tgtText,
   interim,
+  isListening,
   translating,
   controls,
 }: {
   src: Lang;
   tgt: Lang;
+  text: string;
+  setText: (s: string) => void;
   sourceText: string;
   tgtText: string;
   interim: string;
+  isListening: boolean;
   translating: boolean;
   controls: React.ReactNode;
 }) {
@@ -717,23 +737,47 @@ function ParagraphLayout({
   const tgtPs = groupSentencesIntoParagraphs(splitSentences(tgtText));
   const pairs = pairParagraphs(srcPs, tgtPs);
   const scrollRef = useStickyBottom<HTMLDivElement>(sourceText.length + tgtText.length + interim.length);
+  const inputRef = useAutoGrowTextarea(text);
 
   return (
     <>
-      <div className="relative flex items-center justify-between gap-2">
-        {controls}
-        <div className="hidden sm:flex flex-col items-end gap-0.5 text-right">
-          <FlagPair src={src} tgt={tgt} translating={translating} />
+      {/* Mic cluster centered horizontally — only moves up/down with content, not left. */}
+      <div className="relative flex items-center justify-center">{controls}</div>
+
+      {/* Editable source — always visible, lets the user type in Pairs view too. */}
+      <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <FlagLabel lang={src} />
+        <div className="mt-2 min-h-[4.5rem]">
+          {isListening ? (
+            <p className="text-xl leading-snug font-medium">
+              {sourceText}
+              {interim && <span className="text-zinc-400"> {interim}</span>}
+              {!sourceText && !interim && <span className="text-zinc-400">Listening…</span>}
+            </p>
+          ) : (
+            <textarea
+              ref={inputRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Tap the mic or type here — pairs will appear below."
+              rows={2}
+              lang={LANG_META[src].bcp47}
+              spellCheck
+              className="block w-full resize-none bg-transparent text-xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+            />
+          )}
         </div>
+        <DevBadge n={1} label="src·pairs" />
       </div>
 
+      {/* Rendered paragraph pairs — read-only view that mirrors the source above. */}
       <div
         ref={scrollRef}
-        className="relative max-h-[60dvh] min-h-[40dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        className="relative max-h-[55dvh] min-h-[20dvh] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40"
       >
-        <DevBadge n={1} label="pairs" />
+        <DevBadge n={5} label="pairs" />
         {pairs.length === 0 ? (
-          <p className="text-zinc-400">Tap the mic or type — paragraphs will appear here in pairs.</p>
+          <p className="text-zinc-400">Translation will appear here…</p>
         ) : (
           <ul className="space-y-6">
             {pairs.map((p, i) => (
@@ -751,12 +795,6 @@ function ParagraphLayout({
             ))}
           </ul>
         )}
-        {interim && (
-          <p className="mt-4 text-[17px] leading-relaxed italic text-zinc-400">
-            <span className="mr-2 align-middle text-base leading-none">{LANG_META[src].flag}</span>
-            {interim}
-          </p>
-        )}
       </div>
     </>
   );
@@ -767,66 +805,135 @@ function ParagraphLayout({
 // source and translation lines stay in view (older content scrolls off the
 // top). Simultaneous-interpretation captions.
 // ──────────────────────────────────────────────────────────────────────────
+/**
+ * Stream layout — ONE container, top textarea + thin rule + bottom translation.
+ * Each pane scrolls independently. Scrolling either side moves the other
+ * proportionally so the matching segment stays in view.
+ */
 function StreamLayout({
   src,
   tgt,
+  text,
+  setText,
   sourceText,
   tgtText,
   interim,
+  isListening,
   translating,
   controls,
 }: {
   src: Lang;
   tgt: Lang;
+  text: string;
+  setText: (s: string) => void;
   sourceText: string;
   tgtText: string;
   interim: string;
+  isListening: boolean;
   translating: boolean;
   controls: React.ReactNode;
 }) {
-  const srcRef = useStickyBottom<HTMLDivElement>(sourceText.length + interim.length);
-  const tgtRef = useStickyBottom<HTMLDivElement>(tgtText.length);
+  const srcRef = useRef<HTMLDivElement | null>(null);
+  const tgtRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingRef = useRef(false);
+  const inputRef = useAutoGrowTextarea(text);
+
+  // Proportional scroll sync — scrolling one pane moves the other to the same
+  // relative position so the matching translation segment stays in view.
+  // Re-entry guard prevents the scroll handlers from echoing off each other.
+  useEffect(() => {
+    const srcEl = srcRef.current;
+    const tgtEl = tgtRef.current;
+    if (!srcEl || !tgtEl) return;
+
+    const sync = (from: HTMLDivElement, to: HTMLDivElement) => {
+      if (isSyncingRef.current) return;
+      const maxFrom = from.scrollHeight - from.clientHeight;
+      const maxTo = to.scrollHeight - to.clientHeight;
+      if (maxFrom <= 0 || maxTo <= 0) return;
+      isSyncingRef.current = true;
+      to.scrollTop = (from.scrollTop / maxFrom) * maxTo;
+      requestAnimationFrame(() => {
+        isSyncingRef.current = false;
+      });
+    };
+
+    const onSrc = () => sync(srcEl, tgtEl);
+    const onTgt = () => sync(tgtEl, srcEl);
+    srcEl.addEventListener("scroll", onSrc, { passive: true });
+    tgtEl.addEventListener("scroll", onTgt, { passive: true });
+    return () => {
+      srcEl.removeEventListener("scroll", onSrc);
+      tgtEl.removeEventListener("scroll", onTgt);
+    };
+  }, []);
+
+  // Stick-to-bottom on new content (only when user hasn't scrolled away).
+  useEffect(() => {
+    const el = srcRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+    if (nearBottom) el.scrollTop = el.scrollHeight;
+  }, [sourceText, interim]);
+  useEffect(() => {
+    const el = tgtRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
+    if (nearBottom) el.scrollTop = el.scrollHeight;
+  }, [tgtText]);
+
   return (
     <>
-      {controls}
+      {/* Mic cluster centered. */}
+      <div className="relative flex items-center justify-center">{controls}</div>
 
+      {/* Single container with two independently-scrolling halves + thin rule. */}
       <div
-        ref={srcRef}
-        className="relative h-[28dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        className="relative flex flex-col overflow-hidden rounded-2xl border border-zinc-300 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
+        style={{ height: "min(60dvh, 640px)" }}
       >
-        <FlagLabel lang={src} />
-        <p className="mt-2 text-xl leading-snug font-medium">
-          {sourceText}
-          {interim && <span className="text-zinc-400"> {interim}</span>}
-          {!sourceText && !interim && <span className="text-zinc-400">Source…</span>}
-        </p>
-        <DevBadge n={1} label="src·stream" />
-      </div>
+        {/* Top: source — editable when not listening, live transcript when listening. */}
+        <div ref={srcRef} className="relative flex-1 overflow-y-auto px-4 py-3">
+          <FlagLabel lang={src} />
+          <div className="mt-1.5">
+            {isListening ? (
+              <p className="text-xl leading-snug font-medium">
+                {sourceText}
+                {interim && <span className="text-zinc-400"> {interim}</span>}
+                {!sourceText && !interim && <span className="text-zinc-400">Listening…</span>}
+              </p>
+            ) : (
+              <textarea
+                ref={inputRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Tap the mic or type here — translation streams below."
+                rows={2}
+                lang={LANG_META[src].bcp47}
+                spellCheck
+                className="block w-full resize-none bg-transparent text-xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              />
+            )}
+          </div>
+          <DevBadge n={1} label="src·stream" />
+        </div>
 
-      <div
-        ref={tgtRef}
-        className="relative h-[28dvh] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40"
-      >
-        <FlagLabel lang={tgt} loading={translating} />
-        <p className="mt-2 text-xl leading-snug font-semibold">
-          {tgtText || <span className="text-zinc-400">Translation…</span>}
-        </p>
-        <DevBadge n={5} label="tgt·stream" />
+        {/* Thin rule between source and translation halves. */}
+        <hr className="border-t border-zinc-200 dark:border-zinc-800" aria-hidden />
+
+        {/* Bottom: translation. */}
+        <div ref={tgtRef} className="relative flex-1 overflow-y-auto px-4 py-3 bg-zinc-50/60 dark:bg-zinc-800/30">
+          <FlagLabel lang={tgt} loading={translating} />
+          <p className="mt-1.5 text-xl leading-snug font-semibold">
+            {tgtText || <span className="text-zinc-400 font-normal">Translation will appear here…</span>}
+          </p>
+          <DevBadge n={5} label="tgt·stream" />
+        </div>
       </div>
     </>
   );
 }
 
-function FlagPair({ src, tgt, translating }: { src: Lang; tgt: Lang; translating: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
-      <span aria-hidden>{LANG_META[src].flag}</span>
-      <span aria-hidden>→</span>
-      <span aria-hidden>{LANG_META[tgt].flag}</span>
-      {translating && <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />}
-    </span>
-  );
-}
 
 function VoicePicker({
   voices,
