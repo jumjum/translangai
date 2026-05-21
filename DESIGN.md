@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.9)
+# TransLang AI — Design Specification (v0.10)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -7,7 +7,7 @@
 ## 1. Product Goals
 
 1. **Faster + smarter than Google Translate / TranSync** for everyday lookups.
-2. **Any-to-any** between **English, Russian, Danish, German, Swedish, Portuguese, Polish** from day one (42 directed pairs).
+2. **Any-to-any** between **English, Russian, Danish, German, Swedish, Portuguese, Polish, Spanish** from day one (56 directed pairs).
 3. **Words, phrases, idioms, figures of speech** — idioms map to *local equivalents*, not literal translations.
 4. **Multi-source parallel view** — see what 4 different engines say at once.
 5. **Voice in + voice out** — speak in any supported language, see live transcription, hear the translation spoken back.
@@ -20,7 +20,7 @@
 
 - Document translation, OCR — later.
 - Accounts / cloud sync — local storage only for v0.x.
-- Languages outside EN / RU / DA / DE / SV / PT / PL.
+- Languages outside EN / RU / DA / DE / SV / PT / PL / ES.
 
 ---
 

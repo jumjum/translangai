@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import LanguageBar from "@/components/LanguageBar";
 import DevBadge from "@/components/DevBadge";
+import VoiceControl from "@/components/VoiceControl";
 import { saveSession, updateSession, type Session } from "@/lib/history";
 import {
   groupSentencesIntoParagraphs,
@@ -105,6 +106,17 @@ export default function LiveTranslator({
 
   // Auto-grow ref for the manual-text input (Split view).
   const taRef = useAutoGrowTextarea(text);
+
+  // ── Smart swap ───────────────────────────────────────────────────────────
+  // Reverse button on the LanguageBar now also reverses the *text*: the current
+  // translation becomes the new source, and the translation re-runs in the
+  // opposite direction. Cleaner mental model than "just flip the chips and
+  // wonder why the text didn't move."
+  const swapWithText = useCallback(() => {
+    const tgtText = translation?.primary && translation.primary !== "—" ? translation.primary : "";
+    if (tgtText) setText(tgtText);
+    onSwap();
+  }, [translation, setText, onSwap]);
 
   const ttsSupported = isTtsSupported();
   const asrSupported = isSpeechRecognitionSupported();
@@ -465,31 +477,29 @@ export default function LiveTranslator({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      {/* ── Toolbar row: language bar + view switcher + voice/auto-speak ── */}
+      {/* ── Toolbar row: language bar + view switcher + voice control ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="relative">
-          <LanguageBar src={src} tgt={tgt} onChangeSrc={setSrc} onChangeTgt={setTgt} onSwap={onSwap} />
+          <LanguageBar
+            src={src}
+            tgt={tgt}
+            onChangeSrc={setSrc}
+            onChangeTgt={setTgt}
+            onSwap={swapWithText}
+          />
           <DevBadge n={6} label="lang" />
         </div>
         <div className="flex items-center gap-2">
           <ViewSwitcher view={view} setView={setView} />
-          {ttsSupported && voices.length > 0 && (
-            <VoicePicker voices={voices} value={voiceURI} onChange={pickVoice} tgt={tgt} />
-          )}
-          <button
-            type="button"
-            onClick={() => setAutoSpeak((v) => !v)}
-            disabled={!ttsSupported}
-            aria-pressed={autoSpeak}
-            title={ttsSupported ? "Speak the translation aloud automatically (use headphones to avoid feedback)" : "TTS not supported"}
-            className={`relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-              autoSpeak ? BTN_CHIP_ACTIVE : BTN_CHIP
-            }`}
-          >
-            <SpeakerIcon className="h-3.5 w-3.5" />
-            auto-speak
-            <DevBadge n={9} label="auto" position="tr" />
-          </button>
+          <VoiceControl
+            voices={voices}
+            voiceURI={voiceURI}
+            onPickVoice={pickVoice}
+            autoSpeak={autoSpeak}
+            onToggleAutoSpeak={() => setAutoSpeak((v) => !v)}
+            ttsSupported={ttsSupported}
+            tgt={tgt}
+          />
         </div>
       </div>
 
@@ -934,45 +944,6 @@ function StreamLayout({
   );
 }
 
-
-function VoicePicker({
-  voices,
-  value,
-  onChange,
-  tgt,
-}: {
-  voices: SpeechSynthesisVoice[];
-  value: string | undefined;
-  onChange: (uri: string | undefined) => void;
-  tgt: Lang;
-}) {
-  // Sort: local voices first (higher quality on mobile), then alphabetical.
-  const sorted = [...voices].sort((a, b) => {
-    if (a.localService !== b.localService) return a.localService ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-  return (
-    <label
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium ${BTN_CHIP}`}
-      title={`Pick a ${LANG_META[tgt].name} voice from your device`}
-    >
-      <SpeakerIcon className="h-3.5 w-3.5 opacity-70" />
-      <select
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value || undefined)}
-        aria-label={`${LANG_META[tgt].name} voice`}
-        className="max-w-[8rem] truncate bg-transparent pr-1 outline-none"
-      >
-        <option value="">Auto · {LANG_META[tgt].native}</option>
-        {sorted.map((v) => (
-          <option key={v.voiceURI} value={v.voiceURI}>
-            {v.name} {v.localService ? "(on-device)" : "(cloud)"}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 function FlagLabel({ lang, loading }: { lang: Lang; loading?: boolean }) {
   return (

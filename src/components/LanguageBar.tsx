@@ -1,6 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import DevBadge from "@/components/DevBadge";
+import { parseLangPair } from "@/lib/langNames";
+import { isSpeechRecognitionSupported, useSpeechRecognition } from "@/lib/speech";
 import { LANGS, LANG_META, type Lang } from "@/lib/types";
 import { BTN_CHIP } from "@/lib/ui";
 import { useClickAway } from "@/lib/useClickAway";
@@ -14,15 +17,98 @@ type Props = {
 };
 
 /**
- * Language picker chip with a click-to-open dropdown.
+ * Voice-detect language pair.
  *
- * Earlier versions used `onMouseLeave` to close on hover-out — the 8px gap
- * between the chip and the dropdown made it close before the cursor reached
- * the options ("dead zone" between chip bottom and dropdown top).
+ * Listens in the browser's locale (or current source-lang as fallback) and
+ * parses the transcript for known language names — "swedish to english",
+ * "español inglés", "русский немецкий", etc. Updates src/tgt as soon as a
+ * pair is detected. Single-language detections only change src.
+ */
+function LangPairMic({
+  src,
+  onChangeSrc,
+  onChangeTgt,
+}: {
+  src: Lang;
+  onChangeSrc: (l: Lang) => void;
+  onChangeTgt: (l: Lang) => void;
+}) {
+  const supported = isSpeechRecognitionSupported();
+  // Use the browser's locale by default — it's the language the user is most
+  // comfortable speaking. Falls back to the current source lang.
+  const recogLang =
+    typeof navigator !== "undefined" && navigator.language
+      ? navigator.language
+      : LANG_META[src].bcp47;
+  const speech = useSpeechRecognition(recogLang);
+  const finalRef = useRef("");
+
+  // When recognition produces text, try to extract a language pair from it.
+  useEffect(() => {
+    const txt = speech.finalText.trim();
+    if (!txt || txt === finalRef.current) return;
+    finalRef.current = txt;
+    const { src: newSrc, tgt: newTgt } = parseLangPair(txt);
+    if (newSrc) onChangeSrc(newSrc);
+    if (newTgt) onChangeTgt(newTgt);
+    if (newSrc || newTgt) speech.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.finalText]);
+
+  if (!supported) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (speech.listening) {
+          speech.stop();
+        } else {
+          finalRef.current = "";
+          speech.reset();
+          speech.start();
+        }
+      }}
+      aria-pressed={speech.listening}
+      aria-label={
+        speech.listening
+          ? "Listening for language pair…"
+          : "Voice-pick language pair"
+      }
+      title={
+        speech.listening
+          ? "Say a pair, e.g. 'Swedish to English'"
+          : "Voice-pick language pair — say e.g. 'Spanish to English'"
+      }
+      className={`relative grid h-8 w-8 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
+    >
+      {speech.listening && (
+        <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/20 dark:bg-zinc-100/25" />
+      )}
+      <svg className="relative h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+        <path
+          d="M19 12a7 7 0 01-14 0M12 19v3M8 22h8"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <DevBadge n="V" label="voice-pair" position="tr" />
+    </button>
+  );
+}
+
+/**
+ * Language picker chip with click-to-open dropdown.
  *
- * Now: click opens, click-outside or Escape closes, click-option picks.
+ * Click opens, click-outside or Escape closes, click-option picks.
  * Mouse movement does NOT close — once committed, the dropdown stays
- * until the user makes a deliberate gesture. Standard Radix-style behaviour.
+ * until the user makes a deliberate gesture.
  */
 function LangChip({
   lang,
@@ -101,7 +187,8 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
   const close = () => setOpen(null);
 
   return (
-    <div className="flex items-center gap-2 sm:gap-3">
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      <LangPairMic src={src} onChangeSrc={onChangeSrc} onChangeTgt={onChangeTgt} />
       <LangChip
         lang={src}
         label="Source language"
@@ -117,7 +204,8 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
       <button
         type="button"
         onClick={onSwap}
-        aria-label="Swap languages"
+        aria-label="Swap languages and text"
+        title="Swap source ↔ target (and their text)"
         className={`grid h-8 w-8 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>

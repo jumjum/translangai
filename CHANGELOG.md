@@ -4,6 +4,22 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.10.0] — 2026-05-21
+
+### Added
+- 🇪🇸 **Spanish (es)** as the 8th language — 56 directed pairs. Full seed coverage incl. idioms (`pan comido` for "piece of cake", `está lloviendo a cántaros` for "raining cats and dogs"). DeepL `ES`, MyMemory `es`, ASR/TTS `es-ES`.
+- 🎙️ **Voice-pick language pair** — small mic to the left of the source-language chip. Click and say "swedish to english" / "русский немецкий" / "español portugués" and the chips update as soon as a pair is detected. Recognises language names across English, Russian, Danish, German, Swedish, Portuguese, Polish, Spanish (multilingual alias table in `src/lib/langNames.ts`). Listens in the browser locale by default; falls back to the current source-language BCP-47. Single-language detections only change `src`.
+- 🔄 **Smart swap** — the reverse-arrow button on the language bar now swaps both the chips *and* the text content. The current translation flows into the source field, and the translation re-runs in the new direction. Old behaviour ("only flip chips, text stays put") was confusing.
+
+### Changed
+- 🔊 **VoiceControl split button** — the standalone auto-speak chip and voice-picker dropdown are now one pill with a vertical divider down the middle. Left half = speaker toggle (aria-pressed, mute glyph when off, gradient-active when on). Right half = voice picker dropdown (truncated label, caret rotates on open). Saves toolbar width so the language bar + view switcher don't wrap to a second row at narrower widths — Split / Pairs / Stream switching no longer shifts the textarea up and down.
+- LanguageBar: tighter gap (`gap-1.5 sm:gap-2`) to make room for the new voice-pair mic without bloating the toolbar.
+
+### Notes
+- **Keyboard layout switching is still not possible from the web.** The voice-pick mic is the workable alternative: speech-based pair selection without forcing a keyboard change. Real OS keyboard switching will only land in the desktop / mobile native shells.
+
+---
+
 ## [0.9.0] — 2026-05-21
 
 ### Added

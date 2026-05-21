@@ -1,6 +1,6 @@
 // Core domain types — referenced everywhere.
 
-export const LANGS = ["en", "ru", "da", "de", "sv", "pt", "pl"] as const;
+export const LANGS = ["en", "ru", "da", "de", "sv", "pt", "pl", "es"] as const;
 export type Lang = (typeof LANGS)[number];
 
 export const LANG_META: Record<
@@ -14,6 +14,7 @@ export const LANG_META: Record<
   sv: { name: "Swedish",    native: "Svenska",    flag: "🇸🇪", bcp47: "sv-SE", tts: "sv-SE" },
   pt: { name: "Portuguese", native: "Português",  flag: "🇧🇷", bcp47: "pt-BR", tts: "pt-BR" },
   pl: { name: "Polish",     native: "Polski",     flag: "🇵🇱", bcp47: "pl-PL", tts: "pl-PL" },
+  es: { name: "Spanish",    native: "Español",    flag: "🇪🇸", bcp47: "es-ES", tts: "es-ES" },
 };
 
 export type TranslateRequest = {
