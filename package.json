@@ -9,7 +9,10 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "tauri:dev": "cargo tauri dev --config src-tauri/tauri.conf.json",
+    "tauri:build": "cargo tauri build --config src-tauri/tauri.conf.json",
+    "tauri:prebuild": "mkdir -p dist-tauri && echo '<!doctype html><meta http-equiv=refresh content=\"0;url=https://translangai.vercel.app/\">' > dist-tauri/index.html"
   },
   "dependencies": {
     "next": "16.2.6",

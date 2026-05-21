@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TransLang AI",
+  "version": "0.7.0",
+  "identifier": "ai.translang.app",
+  "build": {
+    "frontendDist": "../dist-tauri",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run tauri:prebuild"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "TransLang AI",
+        "url": "https://translangai.vercel.app/",
+        "width": 820,
+        "height": 940,
+        "minWidth": 360,
+        "minHeight": 540,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "macOSPrivateApi": true
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg", "msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Omni-translator — voice, idiom-aware, multi-source.",
+    "longDescription": "Any-to-any dictionary & translator across English, Russian, Danish, German, Swedish, Portuguese. Voice in/out, multi-source compare, offline-capable seed dictionary.",
+    "copyright": "© 2026 TransLang AI"
+  }
+}
