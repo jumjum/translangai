@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.6)
+# TransLang AI — Design Specification (v0.7)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -259,14 +259,72 @@ The local provider is designed as **four tiers**, only Tier 1 + Tier 2 implement
 **v0.3** — Refactored row-based multilingual dictionary (~110 entries), tokenized word-by-word fallback so multi-word inputs **always** return something usable offline. ✅
 **v0.4** — Rebrand to **TransLang AI**, new gradient T→T logo, **voice picker** (lists device's installed voices per language, persisted), continuous-listening with explicit stop buttons (mic + speaker morph into red stop squares while active), **executive summary** on stop for ≥500-word translations (Claude when key set, deterministic extractive fallback otherwise), Lingva provider added (free Google proxy), better failure-state rendering in Compare panels, **anti-echo voice pipeline** (pause-during-TTS + iOS restart-delay + final-segment dedup + smarter auto-speak). ✅
 **v0.5** — **Portuguese (pt-BR)** added as 6th language — 30 directed pairs, full seed coverage (~110 entries), DeepL PT-BR code, ASR `pt-BR`, all free providers work natively. **Chrome Android incremental-final fix** — `lastFinalRef` replace-rather-than-append prevents cascading word duplication. ✅
-**v0.6 (this)** — **History sidebar** (ChatGPT-style fly-in left pane). Sessions ≥ 2 minutes auto-save with transcription + translation + executive summary; each row is one line with miniature `src→tgt` flag pair, timestamp, duration, and per-row delete. Click any row to restore the session into Live mode (no re-translate API call). Persisted to localStorage, cap 50 entries. ✅
-**v0.7** — Downloadable FreeDict / Wiktextract shards stored in IndexedDB (Tier 3). Per-pair "Get full offline dictionary" button. Language auto-detect. More providers (Reverso, Linguee, Wiktionary REST). Pinned favourites.
-**v1.0 (native)** — Tauri wrapper, global hotkey ⌘⇧D, macOS Services "Translate Selection".
+**v0.6** — **History sidebar** (ChatGPT-style fly-in left pane). Sessions ≥ 2 minutes auto-save with transcription + translation + executive summary; each row is one line with miniature `src→tgt` flag pair, timestamp, duration, and per-row delete. Click any row to restore the session into Live mode (no re-translate API call). Persisted to localStorage, cap 50 entries. ✅
+**v0.7 (this)** — **Grayscale Culture/LCARS rebrand** (circuit-board SVG background, monospace provider section codes). **Offline-first PWA service worker**. **Tauri 2 desktop scaffold** for macOS + Windows — remote-URL mode keeps the existing Next.js backend intact. ✅
+**v0.8** — Native global hotkey ⌘⇧D / Ctrl+Shift+D wired through `tauri-plugin-global-shortcut`, macOS menu bar, "Translate Selection" Service. Test Tauri 2 mobile (Android / iOS) build target.
+**v0.9** — Downloadable FreeDict / Wiktextract shards stored in IndexedDB (Tier 3). Per-pair "Get full offline dictionary" button. Language auto-detect. Pinned favourites.
+**v1.0** — Public Tauri release for macOS + Windows. Play Store TWA wrapper for Android (zero rewrite, lists the PWA as a native app).
 
 ---
 
-## 11. Open Questions (defaults chosen, easy to change)
+## 12. Cross-platform architecture (v0.7 forward)
+
+**Decision (2026-05-20): PWA-first + Tauri 2 shell.** Considered Flutter; rejected because (a) the Web Speech API on Flutter Web is JS-interop to the same browser API we already use, with worse error handling, (b) a Dart rewrite would scrap ~65% of the code for marginal gain, (c) Flutter Web ships a ~2MB Skia engine before our code loads — bad for a PWA that needs to feel instant.
+
+### Targets and code sharing
+
+| Target | Stack | Code reused | Effort to ship |
+|---|---|---|---|
+| **Web (PWA)** | Next.js 16 + service worker | 100% | Continuous (Vercel auto-deploy on push to `main`) |
+| **Android (PWA)** | Add-to-Home-Screen today; Play Store via TWA later | 100% | A2HS: 0. TWA wrapper: ~1 day |
+| **iOS (PWA)** | Add-to-Home-Screen via Share sheet | 100% | 0 |
+| **macOS** | Tauri 2 native window → remote-URL mode → loads translangai.vercel.app | ~95% (Rust shell only) | First binary: hours |
+| **Windows** | same | ~95% | hours |
+| **Linux** | same (free byproduct) | ~95% | hours |
+
+### Remote-URL mode rationale
+
+The Tauri window points at `https://translangai.vercel.app/` rather than bundling a static frontend. Reasons:
+
+1. Web app has server-side API routes (`/api/translate`, `/api/summarize`); they need a Node runtime — Vercel already runs that.
+2. Auto-update is free — every `git push` to `main` updates the web app, which is what the desktop window loads on next launch.
+3. No code split — the same `LiveTranslator`, `CompareView`, history sidebar are what you see on every platform. Visual parity is automatic, not a maintenance burden.
+
+Tradeoff: requires internet. For TransLang AI this is fine — every provider already needs network. The only purely-offline path is the local seed dictionary (Tier 1/2), which works in the PWA via cached shell + already-loaded JS.
+
+### Adding native features later
+
+Native-only capabilities land in `src-tauri/src/lib.rs` and call into the web frontend via Tauri's IPC:
+
+- **Global hotkey** (`tauri-plugin-global-shortcut`, already declared): register `⌘⇧D` / `Ctrl+Shift+D`, focus the window, optionally invoke a JS function to start listening.
+- **macOS Services** ("Translate Selection") — handled via `Info.plist` `NSServices` declaration + a Rust handler that posts the selected text into the webview.
+- **System tray** — `tauri::tray::TrayIconBuilder`.
+- **Deep links** — `tauri-plugin-deep-link`.
+
+These features attach to the webview without touching the web code.
+
+### Fork possibilities considered
+
+| Path | When to take it | Cost | Why we didn't pick it now |
+|---|---|---|---|
+| **React Native + Expo** for iOS/Android | If PWA mobile genuinely underperforms (user complaint, not theory) | 4–6 weeks, monorepo restructure into `apps/web` + `apps/mobile` + `packages/core` | Premature — PWAs cover ~90% of cases for translator apps |
+| **Tauri 2 mobile** | Once Tauri's iOS/Android target matures past 2.x | weeks (mostly icon + signing work) | Worth trying before React Native; same Rust + web stack we already have |
+| **Flutter** | Never, for this app | 6–10 weeks rewrite | See §12 decision rationale |
+| **Electron** | Never | similar to Tauri | Tauri 2 binaries are ~5MB vs Electron's ~120MB; the choice is obvious |
+| **Capacitor / Ionic** | If we ever need deep iOS Safari integration not possible via PWA | 1–2 weeks | Tauri 2 mobile beats it on output binary size and language ergonomics |
+| **Supabase / Firebase sync** | When we add multi-device history sync, accounts, or shared dictionaries | 3–5 days for Supabase (preferred — Postgres, open source, no lock-in) | No accounts feature yet; premature |
+
+### Build pipeline (planned)
+
+Today: GitHub → Vercel auto-deploy. Web shipping is solved.
+
+Phase 2 (when first Tauri release matters): GitHub Actions matrix builds `macos-latest` + `windows-latest`, runs `cargo tauri build`, uploads `.dmg` / `.msi` to a Releases page. ~1 hour to wire up using `tauri-action`.
+
+---
+
+## 13. Open Questions (defaults chosen, easy to change)
 
 1. **Mode**: Live or Compare on first open? — **Live**. Better demo, more delightful on phone.
 2. **Free mode default**: ON. Friend's deploy never bills him by accident.
-3. **Default 4 panels (Compare)**: Local · MyMemory · LibreTranslate · LLM (LLM panel will say "add a key" until one is set, which is fine).
+3. **Default 4 panels (Compare)**: Local · MyMemory · Lingva · LLM (LLM panel will say "add a key" until one is set, which is fine).
+4. **Desktop shell loads remote URL or static export?** — **Remote URL** for v0.7. Revisit if we ever decouple the backend.

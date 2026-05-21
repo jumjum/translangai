@@ -4,6 +4,31 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.7.0] — 2026-05-20
+
+### Added — cross-platform foundation
+
+- **Grayscale / Culture-LCARS visual rebrand** — every colored class (indigo, fuchsia, rose, emerald, amber, sky, teal, violet) replaced with zinc. Faint circuit-board background via `BackgroundGrid` SVG (24px dot grid + sparse trace pattern). Provider accent dots in the Compare panels became monospace 3-letter section codes (`LDC`, `MMR`, `LGV`, `LBR`, `DPL`, `LLM`, `THS`). Icons rebuilt monochrome.
+- **Offline-first PWA** — hand-written `public/sw.js` (no Workbox). Shell uses stale-while-revalidate, navigations are network-first with `/` fallback, `/api/*` is network-only so we never serve stale translations. `ServiceWorkerRegister` component, prod-only, registers after window load.
+- **Manifest polish** — grayscale theme color, `display_override: window-controls-overlay` so the future Tauri desktop window gets a clean title bar, PT added to description, maskable icon variant (`/icon-maskable.svg`) for Android safe-zones, launch shortcuts to Live and Compare modes.
+- **Tauri 2 desktop scaffold** (`src-tauri/`) — Cargo manifest, `tauri.conf.json` configured for remote-URL mode (window loads the deployed Vercel app, zero web-app refactor), capabilities for the global-shortcut plugin, README with the first-time `rustup` + `cargo tauri icon` + `cargo tauri dev` setup. npm scripts: `tauri:dev`, `tauri:build`. Produces `.app` + `.dmg` on macOS and `.msi` + `.exe` on Windows.
+
+### Forward vision
+
+The repo is now structured so the **same web codebase** powers four targets:
+
+| Target | Mechanism | Code shared | Status |
+|---|---|---|---|
+| Web (PWA) | Next.js 16 on Vercel + service worker | 100% | Live at translangai.vercel.app |
+| Android (PWA) | Add to Home Screen, or future TWA wrapper for Play Store | 100% | A2HS works today |
+| iOS (PWA) | Add to Home Screen via Share sheet | 100% | A2HS works today |
+| macOS | Tauri 2 native shell loads the web URL | ~95% (Rust shell only) | Scaffolded, untested |
+| Windows | Tauri 2 native shell loads the web URL | ~95% (Rust shell only) | Scaffolded, untested |
+
+Each platform inherits new web features automatically — no per-platform release cycle for normal updates. Native-only features (global hotkey, macOS Services menu, system tray) will land in `src-tauri/src/lib.rs` and call back into the web app via Tauri's IPC.
+
+---
+
 ## [0.6.1] — 2026-05-20
 
 ### Changed
