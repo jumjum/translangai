@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.10)
+# TransLang AI — Design Specification (v0.10 — Pairs redesign queued)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -322,24 +322,77 @@ Phase 2 (when first Tauri release matters): GitHub Actions matrix builds `macos-
 
 ---
 
-## 13. Live-translator views (v0.8)
+## 13. Live-translator views (v0.10 — Pairs redesign queued for v0.11)
 
 Three layouts toggle via a segmented pill in the toolbar. Choice is persisted per device in `localStorage` key `translangai:view`. A fourth column-pair view is planned.
 
 | View | When it's best | How it renders |
 |---|---|---|
 | **Split** (default) | Single thought / a few sentences. The mental model most users come in with. | Source pane (content-sized, auto-grows) → mic+speaker+clear cluster → translation pane (content-sized). Page scrolls; panes never collapse on blur. |
-| **Pairs** (Paragraph) | Long monologue you'll re-read later. | One scrollable column. Source sentence-split into ~25-word paragraphs; each paragraph rendered with a thin rule below it then the matching translated paragraph. Sticky-bottom auto-scroll. Mic cluster at top. |
-| **Stream** | Live interpretation while you talk continuously. | **Single container** with two independently-scrolling halves separated by a thin rule. Scrolling one half drives the other proportionally so the matching translation segment stays in view (re-entry guard prevents echo). Sticks to the bottom on new content unless the user scrolled away. Top half has an editable textarea when not listening, live transcript when listening. |
+| **Pairs** (Paragraph) — **redesign queued** | Following a lecture / speech / sermon in real time. Reading both transcription and translation comfortably without the eye jumping between distant panes. | See §13.1 below. |
+| **Stream** | Live simultaneous interpretation. | **Single container** with two independently-scrolling halves separated by a thin rule. Scrolling one half drives the other proportionally so the matching translation segment stays in view (re-entry guard prevents echo). Sticks to the bottom on new content unless the user scrolled away. Top half has an editable textarea when not listening, live transcript when listening. |
 | **Columns** (planned) | Tablet / desktop landscape, side-by-side proofreading. | Source on left, target on right, both scroll. |
 
-### Segmenting
+### 13.1 Pairs view — the "scrolling teleprompter" model (planned)
 
-For Pairs view we don't make per-paragraph translation calls. Instead we sentence-split the *single full-text* translation that's already been returned and group sentences into ~25-word paragraphs, zipping source and target paragraphs by index. Counts won't always align (one source sentence can become two target sentences); the UI tolerates this by leaving the unmatched slot empty. Lives in `src/lib/segmenter.ts`.
+The design goal is a single text region that **is** the conversation: a continuous vertical flow of source-then-translation paragraph pairs, where the active paragraph (the one the user is typing or dictating into) sits at the bottom and committed pairs scroll upward as new ones arrive. The reader's eye stays in a narrow band — source paragraph immediately above its translation — so you can follow a lecture or speech without the focus jump between two distant panes that Split and Stream layouts impose.
+
+Visual model:
+
+```
+┌─ committed pair 1 ────────────────────┐
+│ 🇸🇪 source paragraph 1                 │
+│ ───── (thin rule)                      │
+│ 🇬🇧 translation paragraph 1            │
+├────────────────────────────────────────┤
+│ 🇸🇪 source paragraph 2                 │
+│ ─────                                  │
+│ 🇬🇧 translation paragraph 2            │
+├─ active pair (cursor here) ───────────┤
+│ 🇸🇪 |what I'm typing right now…        │  ← editable, has the caret
+│ ─────                                  │
+│ 🇬🇧 live translation as I type         │  ← updates with each keystroke
+└────────────────────────────────────────┘
+```
+
+**Mechanics:**
+
+1. **Single editable region** — only the source half of the bottom (active) pair. The caret lives there. Earlier paragraphs are read-only.
+2. **Live translation** below the active source, separated by a thin rule. Updates with every keystroke (debounced 220 ms, same as the existing translate effect).
+3. **Commit triggers** — the active pair "freezes" into the read-only stack above and a fresh empty active pair appears below it when **any** of:
+   - source ends with `.` `?` `!` AND has ≥ 20 words
+   - source has ≥ 60 words even without terminal punctuation
+   - user presses `Enter` twice in succession (explicit hard break)
+   - source goes silent for ≥ 3 s while microphone is active (natural speech pause)
+4. **Auto-scroll** keeps the active pair always visible near the bottom. The committed history is just above it — the eye doesn't leave a vertical band ~2 paragraphs tall.
+5. **Reverse-direction button** flips *every* pair: src text becomes tgt text and vice versa, in the new src/tgt languages. The active pair flips too. Future translations run in the new direction.
+
+**Data model:**
+
+```ts
+type Pair = { id: string; src: string; tgt: string };
+type PairsState = {
+  committed: Pair[];     // frozen, read-only
+  activeSrc: string;     // what the user is typing right now
+  activeTgt: string;     // live translation of activeSrc (re-runs on edits)
+};
+```
+
+`committed` accumulates indefinitely (capped at ~200 entries before FIFO eviction so the DOM stays sane on multi-hour sessions). Optionally persist `committed` to localStorage alongside history sessions (open question — see §15).
+
+**Per-paragraph translation cost:**
+
+Once a pair commits, its translation is frozen — no further API calls for it. Only `activeSrc` triggers debounced retranslation. So a 30-minute lecture with ~60 commit events makes ~60 final translations plus the ~debounced-N intermediates while typing each — comparable to today's cost in Split view.
+
+**Resolves the "Enter not transferred" bug naturally**, because Enter (double) is a first-class commit signal, not whitespace that the translation engine silently drops.
+
+### Segmenting (current Pairs implementation, to be retired)
+
+For the current Pairs view we don't make per-paragraph translation calls. Instead we sentence-split the *single full-text* translation that's already been returned and group sentences into ~25-word paragraphs, zipping source and target paragraphs by index. Counts won't always align (one source sentence can become two target sentences); the UI tolerates this by leaving the unmatched slot empty. Lives in `src/lib/segmenter.ts`. The v0.11 redesign replaces this with the per-paragraph model above.
 
 ### Sticky-bottom scrolling
 
-`useStickyBottom(dep)` in `src/lib/segmenter.ts`. Tracks whether the container is within 24px of its bottom; if yes, content growth scrolls to bottom automatically. If the user scrolls up to read older content the auto-scroll yields — scrolling back down re-engages it.
+`useStickyBottom(dep)` in `src/lib/segmenter.ts`. Tracks whether the container is within 24px of its bottom; if yes, content growth scrolls to bottom automatically. If the user scrolls up to read older content the auto-scroll yields — scrolling back down re-engages it. The new Pairs design keeps this hook unchanged.
 
 ### Per-textarea `lang` attribute (OS dictation hint)
 
