@@ -1,10 +1,19 @@
 // Shared UI recipes — keep these in one place so a button restyle is a one-file change.
 //
-// All variants render as a grey-toned "chip" with a vertical gradient,
-// a 1px inset highlight at top, and a soft drop-shadow. Active state inverts
-// the gradient so the button reads as "pressed in".
+// Visual language (v0.11):
+//   - BTN_CHIP idle: **transparent**, just the text. Subtle hover bg.
+//   - BTN_CHIP_ACTIVE: solid grey gradient ("pressed-in"). Used for the
+//     currently-selected segment of a segmented control, free-mode chip
+//     when paid is enabled, auto-speak when on, etc.
+//   - BTN_HERO: the big mic. Keeps its full grey gradient + soft shadow —
+//     it's the focal point, the one button that should stand out.
+//
+// Rationale: the prior grey-gradient-everywhere look made every chip
+// compete for attention. Transparent idle chips let the *text* carry the
+// affordance; the active state is the only thing that asserts itself
+// visually. Easier to scan, calmer typography rhythm.
 
-/** Primary action button — large, high-contrast. Use for: mic, primary CTAs. */
+/** Primary action button — large, prominent. Used for the mic. */
 export const BTN_HERO =
   "bg-gradient-to-b from-zinc-600 to-zinc-800 text-zinc-50 " +
   "border border-zinc-900/40 " +
@@ -17,21 +26,18 @@ export const BTN_HERO =
   "disabled:opacity-40 disabled:cursor-not-allowed " +
   "transition-[background,box-shadow] duration-150";
 
-/** Secondary chip — smaller, for toolbar buttons (history, voice picker, auto-speak). */
+/** Toolbar chip — transparent until interacted with. */
 export const BTN_CHIP =
-  "bg-gradient-to-b from-zinc-100 to-zinc-200 text-zinc-700 " +
-  "border border-zinc-300 " +
-  "shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(0,0,0,0.08)] " +
-  "hover:from-zinc-50 hover:to-zinc-100 " +
-  "active:from-zinc-200 active:to-zinc-100 active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.15)] " +
-  "dark:from-zinc-800 dark:to-zinc-900 dark:text-zinc-200 dark:border-zinc-700 " +
-  "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(0,0,0,0.4)] " +
-  "dark:hover:from-zinc-700 dark:hover:to-zinc-800 " +
-  "dark:active:from-zinc-900 dark:active:to-zinc-800 " +
+  "bg-transparent text-zinc-600 " +
+  "border border-transparent " +
+  "hover:bg-zinc-100 hover:text-zinc-900 " +
+  "active:bg-zinc-200 " +
+  "dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:active:bg-zinc-700 " +
   "disabled:opacity-40 disabled:cursor-not-allowed " +
-  "transition-[background,box-shadow] duration-150";
+  "transition-colors duration-150";
 
-/** Active chip — like CHIP but in the "selected / pressed" state (ModeSwitch active tab). */
+/** Selected / pressed-in chip — solid grey gradient. Use on the active
+ *  segment of a segmented control or for "on" toggles (e.g. free mode). */
 export const BTN_CHIP_ACTIVE =
   "bg-gradient-to-b from-zinc-700 to-zinc-900 text-zinc-50 " +
   "border border-zinc-900/60 " +

@@ -4,6 +4,39 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.11.0] — 2026-05-21
+
+### Added — Pairs view rebuilt as a scrolling teleprompter (per DESIGN §13.1)
+
+The old Pairs layout duplicated content (a separate input textarea above a rendered-pairs container). Replaced with a single continuous column where the active paragraph (with the caret) sits at the bottom, the live translation appears directly under it separated by a dashed rule, and committed pairs scroll upward as new ones are added. The reader's eye stays in a narrow vertical band — perfect for following a lecture or speech in real time.
+
+**Commit triggers:**
+- `.?!` at end of source **AND** ≥ 20 words → freeze pair, start a new active one.
+- ≥ 60 words even without terminal punctuation (run-on guard).
+- Double-Enter (within 700 ms) → explicit hard break.
+- ≥ 3 s of speech silence while mic is active, with ≥ 5 words → natural pause commit.
+
+Committed pairs are capped at 200 (FIFO eviction) so DOM stays sane during multi-hour sessions. State is held in-memory in `LiveTranslator` — survives Live ↔ Compare ↔ view-switch toggles, resets on full page reload (use the history feature for re-loadable transcripts).
+
+**Reverse-direction button now flips every committed pair**, not just the active one. The whole transcript reads in the new direction, in step with the new chips.
+
+**"Enter not transferred" bug resolved** as a side-effect — Enter is now a first-class commit signal rather than whitespace that translation engines silently drop.
+
+### Added — two-column language picker + frequency sort
+
+- LangChip dropdown is now a **2-column grid** of 8 languages (4 rows × 2 cols), w-19rem. ~half the vertical scroll distance, much faster to pick.
+- New `src/lib/langPairStats.ts` — counts each (src, tgt) selection in `localStorage:translangai:pair-counts`. Every chip pick + swap-button click bumps the count.
+- `rankLangs(side)` returns languages sorted by total usage on that side, with a stable LANGS-order tie-break so a fresh install still shows the deterministic default order.
+- LangChip computes the sort only when the dropdown opens — zero overhead on every keystroke.
+
+### Changed — transparent button chrome
+
+`BTN_CHIP` is now **transparent until interacted with**: no border, no shadow, just text color. Hover gets a subtle bg (`zinc-100` / `zinc-800`). Only `BTN_CHIP_ACTIVE` (selected segment of a segmented control, the "PAID" chip when free mode is off) keeps the solid grey gradient. `BTN_HERO` (the big mic) keeps its full prominence — it's the focal point.
+
+This calms the toolbar visually: each chip's *text* now carries the affordance, not the button chrome. Reading rhythm is quieter; the active state is the only thing that asserts itself.
+
+---
+
 ## [0.10.0] — 2026-05-21
 
 ### Added

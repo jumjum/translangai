@@ -6,9 +6,6 @@ import DevBadge from "@/components/DevBadge";
 import VoiceControl from "@/components/VoiceControl";
 import { saveSession, updateSession, type Session } from "@/lib/history";
 import {
-  groupSentencesIntoParagraphs,
-  pairParagraphs,
-  splitSentences,
   useAutoGrowTextarea,
   useStickyBottom,
 } from "@/lib/segmenter";
@@ -107,14 +104,19 @@ export default function LiveTranslator({
   // Auto-grow ref for the manual-text input (Split view).
   const taRef = useAutoGrowTextarea(text);
 
+  // Pairs view — committed paragraph pairs (read-only history above the active pair).
+  // Lifted here so the swap button can flip every pair, not just the active one.
+  const [pairsCommitted, setPairsCommitted] = useState<Pair[]>([]);
+
   // ── Smart swap ───────────────────────────────────────────────────────────
   // Reverse button on the LanguageBar now also reverses the *text*: the current
   // translation becomes the new source, and the translation re-runs in the
-  // opposite direction. Cleaner mental model than "just flip the chips and
-  // wonder why the text didn't move."
+  // opposite direction. In Pairs view, every committed pair flips too — what
+  // was the source becomes the target in the new direction.
   const swapWithText = useCallback(() => {
-    const tgtText = translation?.primary && translation.primary !== "—" ? translation.primary : "";
-    if (tgtText) setText(tgtText);
+    const tgtTextNow = translation?.primary && translation.primary !== "—" ? translation.primary : "";
+    if (tgtTextNow) setText(tgtTextNow);
+    setPairsCommitted((prev) => prev.map((p) => ({ id: p.id, src: p.tgt, tgt: p.src })));
     onSwap();
   }, [translation, setText, onSwap]);
 
@@ -549,11 +551,12 @@ export default function LiveTranslator({
           tgt={tgt}
           text={text}
           setText={setText}
-          sourceText={sourceText}
           tgtText={tgtText}
           interim={speech.listening ? speech.interim : ""}
           isListening={speech.listening}
           translating={translating}
+          committed={pairsCommitted}
+          setCommitted={setPairsCommitted}
           controls={controlCluster}
         />
       )}
@@ -715,95 +718,198 @@ function ViewSwitcher({ view, setView }: { view: View; setView: (v: View) => voi
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Paragraph layout — single column. Source paragraphs (sentence-grouped to
-// ~25 words each) stacked above thin rules with the matching translated
-// paragraph below. Auto-scrolls to bottom when content grows (sticks to
-// bottom unless the user has scrolled up).
+// Pairs view — scrolling teleprompter. One continuous column of paragraph
+// pairs. Committed pairs are read-only above; the bottom (active) pair has
+// the editable source on top of its live translation. As the active source
+// crosses a commit threshold, the pair freezes into the read-only stack and
+// the editor resets to an empty new active pair. See DESIGN §13.1.
 // ──────────────────────────────────────────────────────────────────────────
+
+export type Pair = { id: string; src: string; tgt: string };
+
+/** Word-count helper local to this layout. */
+function wc(s: string): number {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function ParagraphLayout({
   src,
   tgt,
   text,
   setText,
-  sourceText,
   tgtText,
   interim,
   isListening,
   translating,
+  committed,
+  setCommitted,
   controls,
 }: {
   src: Lang;
   tgt: Lang;
   text: string;
   setText: (s: string) => void;
-  sourceText: string;
   tgtText: string;
   interim: string;
   isListening: boolean;
   translating: boolean;
+  committed: Pair[];
+  setCommitted: React.Dispatch<React.SetStateAction<Pair[]>>;
   controls: React.ReactNode;
 }) {
-  const srcPs = groupSentencesIntoParagraphs(splitSentences(sourceText));
-  const tgtPs = groupSentencesIntoParagraphs(splitSentences(tgtText));
-  const pairs = pairParagraphs(srcPs, tgtPs);
-  const scrollRef = useStickyBottom<HTMLDivElement>(sourceText.length + tgtText.length + interim.length);
+  const scrollRef = useStickyBottom<HTMLDivElement>(
+    committed.length + text.length + tgtText.length + interim.length,
+  );
   const inputRef = useAutoGrowTextarea(text);
+
+  // Track the active source: when speech is on, it's text + interim; otherwise text.
+  const activeSrc = isListening ? (text + (interim ? (text ? " " : "") + interim : "")) : text;
+  const lastTypedRef = useRef(Date.now());
+  const lastEnterRef = useRef(0);
+
+  // commit() is the only path that moves the active pair into the committed list.
+  // We capture text + tgtText at the moment of commit, push them as a frozen
+  // Pair, then reset the active source so the textarea is empty again.
+  const commit = useCallback(() => {
+    const s = text.trim();
+    if (!s) return;
+    const t = (tgtText || "").trim();
+    setCommitted((prev) => {
+      const next: Pair[] = [
+        ...prev,
+        { id: `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, src: s, tgt: t },
+      ];
+      // FIFO cap so the DOM doesn't grow forever during multi-hour sessions.
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+    setText("");
+  }, [text, tgtText, setText, setCommitted]);
+
+  // ── Commit triggers ─────────────────────────────────────────────────────
+  // (a) Sentence-end punctuation + ≥ 20 words, OR
+  // (b) ≥ 60 words even without terminal punctuation (run-on guard).
+  // Runs whenever the source text changes.
+  useEffect(() => {
+    lastTypedRef.current = Date.now();
+    const words = wc(text);
+    if (words >= 60) {
+      commit();
+      return;
+    }
+    if (words >= 20 && /[.!?]\s*$/.test(text.trim())) {
+      commit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  // (c) Speech-pause auto-commit: ≥ 3 s of mic silence and ≥ 5 words.
+  // Resets each time the source changes.
+  useEffect(() => {
+    if (!isListening) return;
+    const id = setTimeout(() => {
+      if (wc(text) >= 5 && Date.now() - lastTypedRef.current >= 3000) {
+        commit();
+      }
+    }, 3100);
+    return () => clearTimeout(id);
+  }, [text, interim, isListening, commit]);
+
+  // (d) Double-Enter — explicit hard break. Handled in onKeyDown so we can
+  // preventDefault and avoid leaving stray newlines in the source field.
+  const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      const now = Date.now();
+      if (now - lastEnterRef.current < 700 && text.trim()) {
+        e.preventDefault();
+        commit();
+        lastEnterRef.current = 0;
+        return;
+      }
+      lastEnterRef.current = now;
+    }
+  };
 
   return (
     <>
-      {/* Mic cluster centered horizontally — only moves up/down with content, not left. */}
       <div className="relative flex items-center justify-center">{controls}</div>
 
-      {/* Editable source — always visible, lets the user type in Pairs view too. */}
-      <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <FlagLabel lang={src} />
-        <div className="mt-2 min-h-[4.5rem]">
-          {isListening ? (
-            <p className="text-xl leading-snug font-medium">
-              {sourceText}
-              {interim && <span className="text-zinc-400"> {interim}</span>}
-              {!sourceText && !interim && <span className="text-zinc-400">Listening…</span>}
-            </p>
-          ) : (
-            <textarea
-              ref={inputRef}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Tap the mic or type here — pairs will appear below."
-              rows={2}
-              lang={LANG_META[src].bcp47}
-              spellCheck
-              className="block w-full resize-none bg-transparent text-xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
-            />
-          )}
-        </div>
-        <DevBadge n={1} label="src·pairs" />
-      </div>
-
-      {/* Rendered paragraph pairs — read-only view that mirrors the source above. */}
+      {/* Single continuous container: committed pairs above, active pair (editable) at the bottom. */}
       <div
         ref={scrollRef}
-        className="relative max-h-[55dvh] min-h-[20dvh] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40"
+        onClick={(e) => {
+          // Click anywhere in the empty space focuses the input — feels like a text field.
+          const tag = (e.target as HTMLElement).tagName;
+          if (tag === "DIV" || tag === "LI") {
+            // Defer focus so the textarea exists by the time we look it up.
+            requestAnimationFrame(() => {
+              const ta = (e.currentTarget as HTMLDivElement).querySelector<HTMLTextAreaElement>("textarea");
+              ta?.focus();
+            });
+          }
+        }}
+        className="relative max-h-[68dvh] min-h-[30dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
       >
-        <DevBadge n={5} label="pairs" />
-        {pairs.length === 0 ? (
-          <p className="text-zinc-400">Translation will appear here…</p>
-        ) : (
-          <ul className="space-y-6">
-            {pairs.map((p, i) => (
-              <li key={i} className="space-y-3">
-                <p className="text-[17px] leading-relaxed font-medium text-zinc-900 dark:text-zinc-100">
-                  <span className="mr-2 align-middle text-base leading-none">{LANG_META[src].flag}</span>
-                  {p.src || <span className="text-zinc-400">…</span>}
-                </p>
-                <hr className="border-t border-zinc-300/70 dark:border-zinc-700/70" />
-                <p className="text-[17px] leading-relaxed text-zinc-700 dark:text-zinc-300">
-                  <span className="mr-2 align-middle text-base leading-none">{LANG_META[tgt].flag}</span>
-                  {p.tgt || (translating ? <span className="text-zinc-400">translating…</span> : <span className="text-zinc-400">…</span>)}
-                </p>
-              </li>
-            ))}
-          </ul>
+        <DevBadge n={1} label="pairs" />
+
+        <ul className="space-y-6">
+          {committed.map((p) => (
+            <li key={p.id} className="space-y-2">
+              <p className="text-[17px] leading-relaxed font-medium text-zinc-900 whitespace-pre-wrap dark:text-zinc-100">
+                <span className="mr-2 align-middle text-base leading-none">{LANG_META[src].flag}</span>
+                {p.src}
+              </p>
+              <hr className="border-t border-zinc-300/80 dark:border-zinc-700/70" />
+              <p className="text-[17px] leading-relaxed text-zinc-700 whitespace-pre-wrap dark:text-zinc-300">
+                <span className="mr-2 align-middle text-base leading-none">{LANG_META[tgt].flag}</span>
+                {p.tgt || <span className="text-zinc-400">…</span>}
+              </p>
+            </li>
+          ))}
+
+          {/* Active pair — editable source on top, live translation below. */}
+          <li className="space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="mt-1 align-middle text-base leading-none">{LANG_META[src].flag}</span>
+              <div className="flex-1">
+                {isListening ? (
+                  <p className="text-[17px] leading-relaxed font-medium whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
+                    {text}
+                    {interim && <span className="text-zinc-400"> {interim}</span>}
+                    {!text && !interim && <span className="text-zinc-400">Listening…</span>}
+                  </p>
+                ) : (
+                  <textarea
+                    ref={inputRef}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type or talk. Press Enter twice to break a paragraph."
+                    rows={1}
+                    lang={LANG_META[src].bcp47}
+                    spellCheck
+                    className="block w-full resize-none bg-transparent text-[17px] leading-relaxed font-medium whitespace-pre-wrap outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                  />
+                )}
+              </div>
+            </div>
+            <hr className="border-t border-dashed border-zinc-300 dark:border-zinc-700" />
+            <p className="text-[17px] leading-relaxed text-zinc-700 whitespace-pre-wrap dark:text-zinc-300">
+              <span className="mr-2 align-middle text-base leading-none">{LANG_META[tgt].flag}</span>
+              {tgtText ? (
+                tgtText
+              ) : translating ? (
+                <span className="text-zinc-400">translating…</span>
+              ) : (
+                <span className="text-zinc-400">Translation will appear here…</span>
+              )}
+            </p>
+          </li>
+        </ul>
+
+        {committed.length === 0 && !activeSrc && (
+          <p className="mt-2 text-center text-[11px] text-zinc-400">
+            Each paragraph commits on `.?!` + 20 words, on a double-Enter, or after a 3 s speech pause.
+          </p>
         )}
       </div>
     </>

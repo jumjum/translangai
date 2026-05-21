@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import DevBadge from "@/components/DevBadge";
 import { parseLangPair } from "@/lib/langNames";
+import { bumpPair, rankLangs } from "@/lib/langPairStats";
 import { isSpeechRecognitionSupported, useSpeechRecognition } from "@/lib/speech";
-import { LANGS, LANG_META, type Lang } from "@/lib/types";
+import { LANG_META, type Lang } from "@/lib/types";
 import { BTN_CHIP } from "@/lib/ui";
 import { useClickAway } from "@/lib/useClickAway";
 
@@ -19,37 +20,35 @@ type Props = {
 /**
  * Voice-detect language pair.
  *
- * Listens in the browser's locale (or current source-lang as fallback) and
- * parses the transcript for known language names — "swedish to english",
- * "español inglés", "русский немецкий", etc. Updates src/tgt as soon as a
- * pair is detected. Single-language detections only change src.
+ * Listens in the browser's locale and parses the transcript against the
+ * multilingual alias table in `src/lib/langNames.ts`.
  */
 function LangPairMic({
   src,
   onChangeSrc,
   onChangeTgt,
+  tgt,
 }: {
   src: Lang;
+  tgt: Lang;
   onChangeSrc: (l: Lang) => void;
   onChangeTgt: (l: Lang) => void;
 }) {
   const supported = isSpeechRecognitionSupported();
-  // Use the browser's locale by default — it's the language the user is most
-  // comfortable speaking. Falls back to the current source lang.
   const recogLang =
-    typeof navigator !== "undefined" && navigator.language
-      ? navigator.language
-      : LANG_META[src].bcp47;
+    typeof navigator !== "undefined" && navigator.language ? navigator.language : LANG_META[src].bcp47;
   const speech = useSpeechRecognition(recogLang);
   const finalRef = useRef("");
 
-  // When recognition produces text, try to extract a language pair from it.
   useEffect(() => {
     const txt = speech.finalText.trim();
     if (!txt || txt === finalRef.current) return;
     finalRef.current = txt;
     const { src: newSrc, tgt: newTgt } = parseLangPair(txt);
-    if (newSrc) onChangeSrc(newSrc);
+    if (newSrc) {
+      onChangeSrc(newSrc);
+      bumpPair(newSrc, newTgt ?? tgt);
+    }
     if (newTgt) onChangeTgt(newTgt);
     if (newSrc || newTgt) speech.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,9 +70,7 @@ function LangPairMic({
       }}
       aria-pressed={speech.listening}
       aria-label={
-        speech.listening
-          ? "Listening for language pair…"
-          : "Voice-pick language pair"
+        speech.listening ? "Listening for language pair…" : "Voice-pick language pair"
       }
       title={
         speech.listening
@@ -104,14 +101,14 @@ function LangPairMic({
 }
 
 /**
- * Language picker chip with click-to-open dropdown.
+ * Language picker chip. Two-column dropdown sorted by usage frequency.
  *
- * Click opens, click-outside or Escape closes, click-option picks.
- * Mouse movement does NOT close — once committed, the dropdown stays
- * until the user makes a deliberate gesture.
+ * Click opens. Click an option picks. Outside click / Escape closes.
+ * Mouse movement does nothing.
  */
 function LangChip({
   lang,
+  side,
   open,
   onToggle,
   onClose,
@@ -120,6 +117,7 @@ function LangChip({
   label,
 }: {
   lang: Lang;
+  side: "src" | "tgt";
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -129,6 +127,10 @@ function LangChip({
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   useClickAway(wrapRef, open, onClose);
+
+  // Compute the sort only when the dropdown opens — avoids reading localStorage
+  // on every render of every chip on every keystroke.
+  const ranked = open ? rankLangs(side) : [];
 
   return (
     <div ref={wrapRef} className="relative">
@@ -155,9 +157,9 @@ function LangChip({
         <div
           role="listbox"
           aria-label={label}
-          className="absolute left-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
+          className="absolute left-0 top-full z-30 mt-2 w-[19rem] grid grid-cols-2 gap-0 overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
         >
-          {LANGS.map((l) => (
+          {ranked.map((l) => (
             <button
               key={l}
               type="button"
@@ -172,8 +174,7 @@ function LangChip({
               aria-selected={l === lang}
             >
               <span className="text-base">{LANG_META[l].flag}</span>
-              <span className="flex-1">{LANG_META[l].native}</span>
-              <span className="text-xs opacity-50">{LANG_META[l].name}</span>
+              <span className="truncate">{LANG_META[l].native}</span>
             </button>
           ))}
         </div>
@@ -188,9 +189,10 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
-      <LangPairMic src={src} onChangeSrc={onChangeSrc} onChangeTgt={onChangeTgt} />
+      <LangPairMic src={src} tgt={tgt} onChangeSrc={onChangeSrc} onChangeTgt={onChangeTgt} />
       <LangChip
         lang={src}
+        side="src"
         label="Source language"
         open={open === "src"}
         onToggle={() => setOpen(open === "src" ? null : "src")}
@@ -198,12 +200,16 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
         excluded={tgt}
         onPick={(l) => {
           onChangeSrc(l);
+          bumpPair(l, tgt);
           close();
         }}
       />
       <button
         type="button"
-        onClick={onSwap}
+        onClick={() => {
+          onSwap();
+          bumpPair(tgt, src);
+        }}
         aria-label="Swap languages and text"
         title="Swap source ↔ target (and their text)"
         className={`grid h-8 w-8 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
@@ -221,6 +227,7 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
       </button>
       <LangChip
         lang={tgt}
+        side="tgt"
         label="Target language"
         open={open === "tgt"}
         onToggle={() => setOpen(open === "tgt" ? null : "tgt")}
@@ -228,6 +235,7 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
         excluded={src}
         onPick={(l) => {
           onChangeTgt(l);
+          bumpPair(src, l);
           close();
         }}
       />

@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.10 — Pairs redesign queued)
+# TransLang AI — Design Specification (v0.11)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -322,14 +322,14 @@ Phase 2 (when first Tauri release matters): GitHub Actions matrix builds `macos-
 
 ---
 
-## 13. Live-translator views (v0.10 — Pairs redesign queued for v0.11)
+## 13. Live-translator views (v0.11)
 
 Three layouts toggle via a segmented pill in the toolbar. Choice is persisted per device in `localStorage` key `translangai:view`. A fourth column-pair view is planned.
 
 | View | When it's best | How it renders |
 |---|---|---|
 | **Split** (default) | Single thought / a few sentences. The mental model most users come in with. | Source pane (content-sized, auto-grows) → mic+speaker+clear cluster → translation pane (content-sized). Page scrolls; panes never collapse on blur. |
-| **Pairs** (Paragraph) — **redesign queued** | Following a lecture / speech / sermon in real time. Reading both transcription and translation comfortably without the eye jumping between distant panes. | See §13.1 below. |
+| **Pairs** (Paragraph) | Following a lecture / speech / sermon in real time. Reading both transcription and translation comfortably without the eye jumping between distant panes. | See §13.1 below — scrolling teleprompter, single editable region. |
 | **Stream** | Live simultaneous interpretation. | **Single container** with two independently-scrolling halves separated by a thin rule. Scrolling one half drives the other proportionally so the matching translation segment stays in view (re-entry guard prevents echo). Sticks to the bottom on new content unless the user scrolled away. Top half has an editable textarea when not listening, live transcript when listening. |
 | **Columns** (planned) | Tablet / desktop landscape, side-by-side proofreading. | Source on left, target on right, both scroll. |
 
