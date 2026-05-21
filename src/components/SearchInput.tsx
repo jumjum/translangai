@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { LANG_META, type Lang } from "@/lib/types";
 import { isSpeechRecognitionSupported, useSpeechRecognition } from "@/lib/speech";
+import { BTN_HERO } from "@/lib/ui";
 
 type Props = {
   value: string;
@@ -85,11 +86,7 @@ export default function SearchInput({ value, onChange, placeholder, micLang }: P
             aria-pressed={speech.listening}
             aria-label={speech.listening ? "Stop listening" : "Speak to translate"}
             title={speech.listening ? "Stop listening" : `Speak in ${LANG_META[micLang!].name}`}
-            className={`relative grid h-9 w-9 place-items-center rounded-full border shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] transition-colors active:scale-95 ${
-              speech.listening
-                ? "border-zinc-300 bg-zinc-50 text-zinc-900 ring-2 ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-100 dark:ring-zinc-100"
-                : "border-zinc-900/20 bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:border-zinc-100/20 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            }`}
+            className={`relative grid h-9 w-9 place-items-center rounded-full active:scale-95 ${BTN_HERO}`}
           >
             {speech.listening && (
               <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/15 dark:bg-zinc-100/20" />

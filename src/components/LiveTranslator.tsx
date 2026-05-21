@@ -586,7 +586,7 @@ export default function LiveTranslator({
                   <button
                     type="button"
                     onClick={() => startSpeaking(summary.text)}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition-colors hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
+                    className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${BTN_CHIP}`}
                   >
                     <SpeakerIcon className="h-3 w-3" />
                     speak summary
@@ -846,7 +846,7 @@ function VoicePicker({
   });
   return (
     <label
-      className="flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:hover:border-zinc-100"
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-medium ${BTN_CHIP}`}
       title={`Pick a ${LANG_META[tgt].name} voice from your device`}
     >
       <SpeakerIcon className="h-3.5 w-3.5 opacity-70" />

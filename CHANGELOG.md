@@ -4,6 +4,16 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.8.1] — 2026-05-21
+
+### Added
+- **R&D quick-links drawer** in the lower-right of the footer. One click opens a popover with every URL we use while iterating: local + production, GitHub repo / issues / PRs / actions, Vercel project / deployments / env vars / logs / deployment-protection / domains, provider consoles (Anthropic, Gemini, Groq, DeepL), free-provider docs (MyMemory, LibreTranslate, Lingva), and current-env relative URLs (`/api/translate?ping=1`, `/manifest.webmanifest`, `/sw.js`). Each row has a hover-only copy-URL button. Closes on outside click or Escape. Hide entirely with `?nodev=1`.
+
+### Changed
+- Remaining buttons (LanguageBar source/target chips + swap, SearchInput mic, LiveTranslator voice picker label, summary-card "speak summary" button) now use the shared `BTN_HERO` / `BTN_CHIP` grey-gradient recipes from `src/lib/ui.ts`. No more one-off button styles — every button in the app reads from the same recipe file.
+
+---
+
 ## [0.8.0] — 2026-05-21
 
 ### Added — three live-translator views

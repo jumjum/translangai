@@ -5,6 +5,7 @@ import LiveTranslator from "@/components/LiveTranslator";
 import CompareView from "@/components/CompareView";
 import HistoryPanel from "@/components/HistoryPanel";
 import DevBadge from "@/components/DevBadge";
+import DevLinksDrawer from "@/components/DevLinksDrawer";
 import type { Session } from "@/lib/history";
 import type { Lang } from "@/lib/types";
 import { BTN_CHIP, BTN_CHIP_ACTIVE } from "@/lib/ui";
@@ -104,8 +105,10 @@ export default function Home() {
         />
       )}
 
-      <footer className="pt-2 text-center text-[11px] text-zinc-400">
-        MVP · web + mobile · voice in/out via Web Speech API · native macOS coming soon
+      <footer className="flex items-center justify-between gap-3 pt-2 text-[11px] text-zinc-400">
+        <span className="hidden sm:inline">web · mobile · voice via Web Speech · Tauri desktop coming</span>
+        <span className="sm:hidden">web · mobile · voice · desktop coming</span>
+        <DevLinksDrawer />
       </footer>
 
       <HistoryPanel

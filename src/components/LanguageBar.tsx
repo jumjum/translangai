@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LANGS, LANG_META, type Lang } from "@/lib/types";
+import { BTN_CHIP } from "@/lib/ui";
 
 type Props = {
   src: Lang;
@@ -32,7 +33,7 @@ function LangChip({
         type="button"
         onClick={onOpen}
         aria-label={`${label}: ${LANG_META[lang].name}`}
-        className="group flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors hover:border-zinc-900 active:scale-[0.98] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:hover:border-zinc-100"
+        className={`group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium active:scale-[0.98] ${BTN_CHIP}`}
       >
         <span className="text-base leading-none">{LANG_META[lang].flag}</span>
         <span>{LANG_META[lang].native}</span>
@@ -91,7 +92,7 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
         type="button"
         onClick={onSwap}
         aria-label="Swap languages"
-        className="grid h-8 w-8 place-items-center rounded-full border border-zinc-300 bg-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors hover:border-zinc-900 active:scale-95 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:hover:border-zinc-100"
+        className={`grid h-8 w-8 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
           <path d="M3 4h8m0 0L8 1m3 3L8 7M11 10H3m0 0l3 3m-3-3l3-3" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
