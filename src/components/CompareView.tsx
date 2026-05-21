@@ -150,7 +150,7 @@ function Hint({ q, onPick }: { q: string; onPick: (v: string) => void }) {
     <button
       type="button"
       onClick={() => onPick(q)}
-      className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-[11px] text-zinc-700 hover:bg-indigo-100 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-indigo-500/20"
+      className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-[11px] text-zinc-700 hover:bg-zinc-900 hover:text-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-900 transition-colors"
     >
       {q}
     </button>

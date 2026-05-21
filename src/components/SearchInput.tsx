@@ -47,7 +47,7 @@ export default function SearchInput({ value, onChange, placeholder, micLang }: P
   const showMic = !!micLang && isSpeechRecognitionSupported();
 
   return (
-    <div className="relative rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-400/20 transition-colors">
+    <div className="relative rounded-2xl border border-zinc-300 bg-white shadow-sm transition-colors focus-within:border-zinc-900 focus-within:ring-2 focus-within:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:focus-within:border-zinc-100 dark:focus-within:ring-zinc-100/15">
       <textarea
         ref={ref}
         value={value}
@@ -85,14 +85,14 @@ export default function SearchInput({ value, onChange, placeholder, micLang }: P
             aria-pressed={speech.listening}
             aria-label={speech.listening ? "Stop listening" : "Speak to translate"}
             title={speech.listening ? "Stop listening" : `Speak in ${LANG_META[micLang!].name}`}
-            className={`relative grid h-9 w-9 place-items-center rounded-full text-white shadow-sm transition-colors ${
+            className={`relative grid h-9 w-9 place-items-center rounded-full border shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] transition-colors active:scale-95 ${
               speech.listening
-                ? "bg-gradient-to-br from-rose-500 to-rose-600"
-                : "bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700"
+                ? "border-zinc-300 bg-zinc-50 text-zinc-900 ring-2 ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-100 dark:ring-zinc-100"
+                : "border-zinc-900/20 bg-zinc-900 text-zinc-50 hover:bg-zinc-800 dark:border-zinc-100/20 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             }`}
           >
             {speech.listening && (
-              <span className="absolute inset-0 animate-ping rounded-full bg-rose-500/40" />
+              <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/15 dark:bg-zinc-100/20" />
             )}
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" strokeWidth="2" />
@@ -103,13 +103,15 @@ export default function SearchInput({ value, onChange, placeholder, micLang }: P
       </div>
 
       {speech.listening && (
-        <div className="absolute bottom-1 left-4 flex items-center gap-1.5 text-[11px] text-rose-500">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
-          listening in {LANG_META[micLang!].name}…
+        <div className="absolute bottom-1 left-4 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-900 dark:text-zinc-100">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-900 dark:bg-zinc-100" />
+          LIVE · {LANG_META[micLang!].name}
         </div>
       )}
       {speech.error && !speech.listening && (
-        <div className="absolute bottom-1 left-4 text-[11px] text-rose-500">mic: {speech.error}</div>
+        <div className="absolute bottom-1 left-4 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-900 dark:text-zinc-100">
+          mic err · {speech.error}
+        </div>
       )}
     </div>
   );

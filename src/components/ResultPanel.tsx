@@ -13,14 +13,19 @@ type Props = {
   empty?: boolean;
 };
 
-const ACCENTS: Record<string, string> = {
-  indigo: "bg-indigo-500",
-  emerald: "bg-emerald-500",
-  amber: "bg-amber-500",
-  rose: "bg-rose-500",
-  sky: "bg-sky-500",
-  teal: "bg-teal-500",
-  violet: "bg-violet-500",
+/**
+ * Section-codename labels (Culture/LCARS style) per provider id.
+ * Replaces the old colored accent dots — we're monochrome now, so each
+ * provider gets a 2-3 letter code chip beside its name instead.
+ */
+const PROVIDER_CODE: Record<string, string> = {
+  local: "LDC",
+  mymemory: "MMR",
+  lingva: "LGV",
+  libre: "LBR",
+  deepl: "DPL",
+  llm: "LLM",
+  thesaurus: "THS",
 };
 
 /** Classify a provider failure so we can render a meaningful icon + CTA. */
@@ -85,14 +90,9 @@ function FailureBlock({ kind, message, hint }: NonNullable<ReturnType<typeof cla
         <path d="M12 8h.01M11 12h1v5h1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     );
+  // Everything monochrome — the icon disambiguates the kind, so tone is uniform.
   const tone =
-    kind === "free-mode"
-      ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-500/5 border-emerald-200/60 dark:border-emerald-500/20"
-      : kind === "missing-key"
-        ? "text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-500/5 border-amber-200/60 dark:border-amber-500/20"
-        : kind === "network"
-          ? "text-rose-600 dark:text-rose-400 bg-rose-50/70 dark:bg-rose-500/5 border-rose-200/60 dark:border-rose-500/20"
-          : "text-zinc-500 dark:text-zinc-400 bg-zinc-50/70 dark:bg-zinc-800/40 border-zinc-200/60 dark:border-white/5";
+    "text-zinc-600 dark:text-zinc-400 bg-zinc-50/70 dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-700";
   return (
     <div className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${tone}`}>
       <span className="mt-0.5 shrink-0">{icon}</span>
@@ -127,7 +127,9 @@ export default function ResultPanel({
     <div className="relative flex h-full min-h-[180px] flex-col rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-black/5 dark:border-white/5 px-4 py-2.5">
-        <span className={`h-2 w-2 rounded-full ${ACCENTS[info.accent] ?? "bg-zinc-400"}`} />
+        <span className="rounded border border-zinc-300 bg-zinc-50 px-1 font-mono text-[10px] uppercase tracking-wider text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          {PROVIDER_CODE[info.id] ?? info.id.slice(0, 3).toUpperCase()}
+        </span>
         <button
           type="button"
           onClick={() => setPickerOpen((v) => !v)}
@@ -152,11 +154,13 @@ export default function ResultPanel({
                   onChangeProvider(p.id);
                   setPickerOpen(false);
                 }}
-                className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-indigo-50 dark:hover:bg-indigo-500/10 ${
-                  p.id === providerId ? "bg-indigo-50 dark:bg-indigo-500/10" : ""
+                className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+                  p.id === providerId ? "bg-zinc-100 dark:bg-zinc-800" : ""
                 }`}
               >
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${ACCENTS[p.accent]}`} />
+                <span className="mt-0.5 shrink-0 rounded border border-zinc-300 bg-zinc-50 px-1 font-mono text-[10px] uppercase tracking-wider text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                  {PROVIDER_CODE[p.id] ?? p.id.slice(0, 3).toUpperCase()}
+                </span>
                 <span>
                   <span className="block text-sm font-medium">{p.name}</span>
                   <span className="block text-xs text-zinc-500">{p.description}</span>
@@ -203,8 +207,8 @@ export default function ResultPanel({
               </p>
             )}
             {result.idiomatic && (
-              <div className="rounded-lg border border-amber-200/60 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 px-3 py-2 text-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+              <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900/60">
+                <p className="text-xs font-mono uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
                   idiom
                 </p>
                 <p className="mt-1">

@@ -63,7 +63,7 @@ export default function Home() {
             onClick={() => setHistoryOpen(true)}
             aria-label="Open history"
             title="History"
-            className="grid h-9 w-9 place-items-center rounded-xl border border-black/10 bg-white shadow-sm transition-colors hover:border-indigo-400 dark:border-white/10 dark:bg-zinc-900"
+            className="group relative grid h-9 w-9 place-items-center rounded-xl border border-zinc-300 bg-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] transition-colors hover:border-zinc-900 hover:bg-zinc-50 active:scale-95 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:hover:border-zinc-100 dark:hover:bg-zinc-800"
           >
             <HistoryIcon className="h-4 w-4" />
           </button>
@@ -129,13 +129,15 @@ function HistoryIcon({ className }: { className?: string }) {
 
 function ModeSwitch({ mode, setMode }: { mode: "live" | "compare"; setMode: (m: "live" | "compare") => void }) {
   return (
-    <div className="inline-flex rounded-full border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-1 text-xs font-medium shadow-sm">
+    <div className="relative inline-flex rounded-full border border-zinc-300 bg-white p-1 text-xs font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
       <button
         type="button"
         onClick={() => setMode("live")}
         aria-pressed={mode === "live"}
         className={`rounded-full px-3 py-1.5 transition-colors ${
-          mode === "live" ? "bg-indigo-500 text-white" : "text-zinc-600 dark:text-zinc-300"
+          mode === "live"
+            ? "bg-zinc-900 text-zinc-50 shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+            : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         }`}
       >
         Live
@@ -145,7 +147,9 @@ function ModeSwitch({ mode, setMode }: { mode: "live" | "compare"; setMode: (m: 
         onClick={() => setMode("compare")}
         aria-pressed={mode === "compare"}
         className={`rounded-full px-3 py-1.5 transition-colors ${
-          mode === "compare" ? "bg-indigo-500 text-white" : "text-zinc-600 dark:text-zinc-300"
+          mode === "compare"
+            ? "bg-zinc-900 text-zinc-50 shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+            : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         }`}
       >
         Compare
@@ -161,14 +165,18 @@ function FreeModeChip({ freeMode, setFreeMode }: { freeMode: boolean; setFreeMod
       onClick={() => setFreeMode(!freeMode)}
       aria-pressed={freeMode}
       title={freeMode ? "Only free providers will be called (no API costs)." : "Paid providers (DeepL / LLM) are enabled."}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] transition-colors dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ${
         freeMode
-          ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-          : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+          ? "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
+          : "border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
       }`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${freeMode ? "bg-emerald-500" : "bg-amber-500"}`} />
-      {freeMode ? "free mode" : "paid enabled"}
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          freeMode ? "bg-zinc-400 dark:bg-zinc-500" : "bg-zinc-50 dark:bg-zinc-900"
+        }`}
+      />
+      {freeMode ? "FREE" : "PAID"}
     </button>
   );
 }
@@ -178,10 +186,11 @@ function Logo() {
     <div className="flex items-center gap-2.5">
       <span
         aria-hidden
-        className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-rose-500 text-white shadow-md ring-1 ring-black/5"
+        className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-zinc-300 bg-zinc-900 text-zinc-50 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] dark:border-zinc-100/20 dark:bg-zinc-100 dark:text-zinc-900"
       >
-        {/* Subtle inner highlight */}
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/0 via-white/10 to-white/30" />
+        {/* Hairline corner trace — chip pin */}
+        <span className="pointer-events-none absolute left-1 top-1 h-1 w-1 border-l border-t border-current opacity-50" />
+        <span className="pointer-events-none absolute right-1 bottom-1 h-1 w-1 border-r border-b border-current opacity-50" />
         {/* T → T mark */}
         <svg viewBox="0 0 28 28" className="relative h-5 w-5" fill="none" aria-hidden>
           <text x="3" y="11" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="11" fill="currentColor">T</text>
@@ -191,10 +200,10 @@ function Logo() {
         </svg>
       </span>
       <div className="flex flex-col leading-tight">
-        <h1 className="bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-rose-600 bg-clip-text text-base font-bold tracking-tight text-transparent sm:text-lg dark:from-indigo-400 dark:via-fuchsia-400 dark:to-rose-400">
+        <h1 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-lg">
           TransLang&nbsp;AI
         </h1>
-        <span className="hidden text-[10px] text-zinc-500 sm:inline">omni-translator</span>
+        <span className="system-label hidden text-zinc-500 sm:inline">omni · translator</span>
       </div>
     </div>
   );

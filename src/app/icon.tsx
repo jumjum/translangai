@@ -10,15 +10,17 @@ export default function Icon() {
         style={{
           width: "100%",
           height: "100%",
-          background: "linear-gradient(135deg, #6366f1, #d946ef, #f43f5e)",
-          color: "#fff",
+          background: "#0a0a0b",
+          color: "#fafafa",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: 800,
           borderRadius: 7,
           letterSpacing: -1,
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          border: "1px solid #27272a",
         }}
       >
         T→T

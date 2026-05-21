@@ -140,7 +140,7 @@ export default function HistoryPanel({ open, onClose, onLoad }: Props) {
                       deleteSession(s.id);
                     }}
                     aria-label="Delete session"
-                    className="mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 opacity-60 hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                    className="mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 opacity-60 hover:bg-zinc-900 hover:text-zinc-50 group-hover:opacity-100 dark:hover:bg-zinc-100 dark:hover:text-zinc-900"
                   >
                     <TrashIcon className="h-3.5 w-3.5" />
                   </button>

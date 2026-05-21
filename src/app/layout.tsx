@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import BackgroundGrid from "@/components/BackgroundGrid";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-sans", subsets: ["latin", "cyrillic"] });
@@ -8,7 +9,7 @@ const jbMono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "TransLang AI — omni-translator",
   description:
-    "Any-to-any dictionary & translator (EN · RU · DA · DE · SV). Voice in/out, idiom-aware, multi-source compare. Mobile-first PWA.",
+    "Any-to-any dictionary & translator (EN · RU · DA · DE · SV · PT). Voice in/out, idiom-aware, multi-source compare. Mobile-first PWA.",
   applicationName: "TransLang AI",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -33,7 +34,8 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable} ${jbMono.variable} antialiased`}>
-      <body className="min-h-dvh bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
+      <body className="relative min-h-dvh bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
+        <BackgroundGrid />
         {children}
       </body>
     </html>

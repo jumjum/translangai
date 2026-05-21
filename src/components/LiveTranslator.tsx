@@ -366,10 +366,10 @@ export default function LiveTranslator({
             disabled={!ttsSupported}
             aria-pressed={autoSpeak}
             title={ttsSupported ? "Speak the translation aloud automatically (use headphones to avoid feedback)" : "TTS not supported"}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] transition-colors dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ${
               autoSpeak
-                ? "border-indigo-400 bg-indigo-500 text-white"
-                : "border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900"
+                ? "border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
             } disabled:opacity-40`}
           >
             <SpeakerIcon className="h-3.5 w-3.5" />
@@ -379,7 +379,7 @@ export default function LiveTranslator({
       </div>
 
       {/* Source pane */}
-      <div className="relative flex-1 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 p-4 shadow-sm min-h-[120px]">
+      <div className="relative flex-1 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 min-h-[120px]">
         <FlagLabel lang={src} />
         {speech.listening ? (
           <p className="mt-2 text-2xl leading-snug font-medium">
@@ -416,32 +416,41 @@ export default function LiveTranslator({
           disabled={!ttsSupported || (!isSpeaking && (!translation?.primary || translation.primary === "—"))}
           aria-label={isSpeaking ? "Stop speaking" : "Speak the translation"}
           aria-pressed={isSpeaking}
-          className={`grid h-12 w-12 place-items-center rounded-full shadow-sm transition-colors disabled:opacity-40 ${
+          className={`grid h-12 w-12 place-items-center rounded-full border shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors active:scale-95 disabled:opacity-40 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] ${
             isSpeaking
-              ? "bg-gradient-to-br from-rose-500 to-rose-600 text-white"
-              : "bg-white text-current dark:bg-zinc-900 border border-black/10 dark:border-white/10 hover:border-indigo-400"
+              ? "border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+              : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
           }`}
         >
           {isSpeaking ? <StopIcon className="h-5 w-5" /> : <SpeakerIcon className="h-5 w-5" />}
         </button>
 
-        {/* Mic / Stop-listening button */}
+        {/* Mic / Stop-listening button — the Culture-y hero element */}
         <button
           type="button"
           onClick={speech.toggle}
           disabled={!asrSupported}
           aria-pressed={speech.listening}
           aria-label={speech.listening ? "Stop listening" : "Start listening"}
-          className={`relative grid h-20 w-20 place-items-center rounded-full text-white shadow-lg transition-transform active:scale-95 ${
+          className={`relative grid h-20 w-20 place-items-center rounded-full border shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
             speech.listening
-              ? "bg-gradient-to-br from-rose-500 to-rose-600"
-              : "bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-rose-500"
-          } disabled:opacity-40 disabled:cursor-not-allowed`}
+              ? "border-zinc-300 bg-zinc-50 text-zinc-900 ring-2 ring-zinc-900 ring-offset-2 ring-offset-zinc-50 dark:border-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:ring-zinc-100 dark:ring-offset-zinc-950"
+              : "border-zinc-100/20 bg-zinc-900 text-zinc-50 shadow-zinc-900/30 dark:border-zinc-900/40 dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-zinc-900/50"
+          }`}
         >
+          {/* Inner highlight ring — chip socket feel */}
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute inset-1 rounded-full ${
+              speech.listening
+                ? "border border-zinc-900/10 dark:border-zinc-900/20"
+                : "border border-zinc-100/15 dark:border-zinc-900/15"
+            }`}
+          />
           {speech.listening && (
-            <span className="absolute inset-0 animate-ping rounded-full bg-rose-500/40" />
+            <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/15 dark:bg-zinc-100/20" />
           )}
-          {speech.listening ? <StopIcon className="h-9 w-9" /> : <MicIcon className="h-8 w-8" />}
+          {speech.listening ? <StopIcon className="relative h-9 w-9" /> : <MicIcon className="relative h-8 w-8" />}
         </button>
 
         {/* Clear button */}
@@ -449,14 +458,14 @@ export default function LiveTranslator({
           type="button"
           onClick={clearAll}
           aria-label="Clear all"
-          className="grid h-12 w-12 place-items-center rounded-full bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 shadow-sm hover:border-indigo-400 transition-colors"
+          className="grid h-12 w-12 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors hover:border-zinc-900 active:scale-95 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] dark:hover:border-zinc-100"
         >
           <TrashIcon className="h-5 w-5" />
         </button>
       </div>
 
       {/* Translation pane */}
-      <div className="relative flex-1 rounded-2xl border border-black/10 dark:border-white/10 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-500/10 dark:to-zinc-900 p-4 shadow-sm min-h-[140px]">
+      <div className="relative flex-1 rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40 min-h-[140px]">
         <FlagLabel lang={tgt} loading={translating} />
         {translation?.primary && translation.primary !== "—" ? (
           <p className="mt-2 text-2xl leading-snug font-semibold">{translation.primary}</p>
@@ -483,22 +492,25 @@ export default function LiveTranslator({
 
       {/* Executive summary card */}
       {(summary || summarizing) && (
-        <div className="rounded-2xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50/60 dark:bg-amber-500/5 p-4 shadow-sm">
+        <div className="relative rounded-2xl border border-zinc-300 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+          {/* Trek-style top corner trace */}
+          <span aria-hidden className="pointer-events-none absolute left-0 top-0 h-3 w-8 rounded-tl-2xl border-l border-t border-zinc-900/40 dark:border-zinc-100/40" />
+          <span aria-hidden className="pointer-events-none absolute right-0 bottom-0 h-3 w-8 rounded-br-2xl border-r border-b border-zinc-900/40 dark:border-zinc-100/40" />
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-              Executive summary
+            <h3 className="system-label text-zinc-900 dark:text-zinc-100">
+              ▸ Executive summary
             </h3>
             {summary && (
-              <span className="text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-300/70">
-                {summary.provider === "llm" ? "Claude" : "heuristic"}
+              <span className="system-label text-zinc-500 dark:text-zinc-400">
+                {summary.provider === "llm" ? "src · CLAUDE" : "src · HEURISTIC"}
               </span>
             )}
           </div>
           {summarizing ? (
             <div className="mt-3 space-y-2">
-              <div className="h-4 w-full animate-pulse rounded bg-amber-200/40 dark:bg-amber-500/10" />
-              <div className="h-4 w-5/6 animate-pulse rounded bg-amber-200/40 dark:bg-amber-500/10" />
-              <div className="h-4 w-3/4 animate-pulse rounded bg-amber-200/40 dark:bg-amber-500/10" />
+              <div className="h-4 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
+              <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-200/60 dark:bg-zinc-800/60" />
             </div>
           ) : (
             summary && (
@@ -507,7 +519,7 @@ export default function LiveTranslator({
                   {summary.text}
                 </p>
                 {summary.note && (
-                  <p className="mt-2 text-[11px] italic text-amber-700/70 dark:text-amber-300/70">
+                  <p className="mt-2 text-[11px] italic text-zinc-500 dark:text-zinc-400">
                     {summary.note}
                   </p>
                 )}
@@ -515,7 +527,7 @@ export default function LiveTranslator({
                   <button
                     type="button"
                     onClick={() => startSpeaking(summary.text)}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition-colors hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
                   >
                     <SpeakerIcon className="h-3 w-3" />
                     speak summary
@@ -528,14 +540,17 @@ export default function LiveTranslator({
       )}
 
       {/* Status row */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
         <span>
           {asrSupported ? (
             speech.listening ? (
-              <span className="text-rose-500">
-                ● listening in {LANG_META[src].name}… tap stop when done
+              <span className="inline-flex items-center gap-1.5 font-mono text-zinc-900 dark:text-zinc-100">
+                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-900 dark:bg-zinc-100" />
+                LIVE · {LANG_META[src].name.toUpperCase()} · tap STOP to end
                 {translation?.primary && translation.primary !== "—" && (
-                  <> · {wordCount(translation.primary)}/{SUMMARY_THRESHOLD_WORDS} words to summary</>
+                  <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                    {" "}· {wordCount(translation.primary)}/{SUMMARY_THRESHOLD_WORDS} → summary
+                  </span>
                 )}
               </span>
             ) : (
@@ -547,7 +562,7 @@ export default function LiveTranslator({
             "Voice input not supported here — try Chrome, Edge, or Safari."
           )}
         </span>
-        {speech.error && <span className="text-rose-500">err: {speech.error}</span>}
+        {speech.error && <span className="font-mono text-zinc-900 dark:text-zinc-100">ERR · {speech.error}</span>}
       </div>
     </div>
   );
@@ -571,7 +586,7 @@ function VoicePicker({
   });
   return (
     <label
-      className="flex items-center gap-1 rounded-full border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs font-medium shadow-sm"
+      className="flex items-center gap-1 rounded-full border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:hover:border-zinc-100"
       title={`Pick a ${LANG_META[tgt].name} voice from your device`}
     >
       <SpeakerIcon className="h-3.5 w-3.5 opacity-70" />
@@ -598,7 +613,7 @@ function FlagLabel({ lang, loading }: { lang: Lang; loading?: boolean }) {
       <span className="text-base leading-none">{LANG_META[lang].flag}</span>
       <span>{LANG_META[lang].native}</span>
       {loading && (
-        <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
+        <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-900 dark:bg-zinc-100" />
       )}
     </div>
   );
