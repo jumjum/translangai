@@ -764,7 +764,6 @@ function ParagraphLayout({
 
   // Track the active source: when speech is on, it's text + interim; otherwise text.
   const activeSrc = isListening ? (text + (interim ? (text ? " " : "") + interim : "")) : text;
-  const lastTypedRef = useRef(Date.now());
   const lastEnterRef = useRef(0);
 
   // commit() is the only path that moves the active pair into the committed list.
@@ -788,9 +787,9 @@ function ParagraphLayout({
   // ── Commit triggers ─────────────────────────────────────────────────────
   // (a) Sentence-end punctuation + ≥ 20 words, OR
   // (b) ≥ 60 words even without terminal punctuation (run-on guard).
+  // (c) Double-Enter — see onKeyDown below.
   // Runs whenever the source text changes.
   useEffect(() => {
-    lastTypedRef.current = Date.now();
     const words = wc(text);
     if (words >= 60) {
       commit();
@@ -802,19 +801,7 @@ function ParagraphLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
 
-  // (c) Speech-pause auto-commit: ≥ 3 s of mic silence and ≥ 5 words.
-  // Resets each time the source changes.
-  useEffect(() => {
-    if (!isListening) return;
-    const id = setTimeout(() => {
-      if (wc(text) >= 5 && Date.now() - lastTypedRef.current >= 3000) {
-        commit();
-      }
-    }, 3100);
-    return () => clearTimeout(id);
-  }, [text, interim, isListening, commit]);
-
-  // (d) Double-Enter — explicit hard break. Handled in onKeyDown so we can
+  // (c) Double-Enter — explicit hard break. Handled in onKeyDown so we can
   // preventDefault and avoid leaving stray newlines in the source field.
   const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {

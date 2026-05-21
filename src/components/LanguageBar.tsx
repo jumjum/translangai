@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import DevBadge from "@/components/DevBadge";
 import { parseLangPair } from "@/lib/langNames";
 import { bumpPair, rankLangs } from "@/lib/langPairStats";
-import { isSpeechRecognitionSupported, useSpeechRecognition } from "@/lib/speech";
+import { isSpeechRecognitionSupported } from "@/lib/speech";
 import { LANG_META, type Lang } from "@/lib/types";
 import { BTN_CHIP } from "@/lib/ui";
 import { useClickAway } from "@/lib/useClickAway";
@@ -18,82 +18,150 @@ type Props = {
 };
 
 /**
- * Voice-detect language pair.
+ * Voice-pick language pair — "polyglot" mode.
  *
- * Listens in the browser's locale and parses the transcript against the
- * multilingual alias table in `src/lib/langNames.ts`.
+ * The browser's SpeechRecognition needs a single language per session, so
+ * we run sequential attempts: first in `navigator.language`, then in
+ * `en-US` if the first attempt's transcript didn't parse to any known
+ * language name. That covers two of the most likely speaker profiles
+ * (native speaker + English speaker) on a single click.
+ *
+ * The alias table in `src/lib/langNames.ts` already contains language
+ * names spelled in all 8 supported tongues, so a single successful
+ * transcription is usually enough.
  */
 function LangPairMic({
-  src,
+  tgt,
   onChangeSrc,
   onChangeTgt,
-  tgt,
 }: {
-  src: Lang;
   tgt: Lang;
   onChangeSrc: (l: Lang) => void;
   onChangeTgt: (l: Lang) => void;
 }) {
   const supported = isSpeechRecognitionSupported();
-  const recogLang =
-    typeof navigator !== "undefined" && navigator.language ? navigator.language : LANG_META[src].bcp47;
-  const speech = useSpeechRecognition(recogLang);
-  const finalRef = useRef("");
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop: () => void; abort: () => void } | null>(null);
+  const queueRef = useRef<string[]>([]);
 
-  useEffect(() => {
-    const txt = speech.finalText.trim();
-    if (!txt || txt === finalRef.current) return;
-    finalRef.current = txt;
-    const { src: newSrc, tgt: newTgt } = parseLangPair(txt);
-    if (newSrc) {
-      onChangeSrc(newSrc);
-      bumpPair(newSrc, newTgt ?? tgt);
+  const tryNext = useCallback(() => {
+    const lang = queueRef.current.shift();
+    if (!lang || typeof window === "undefined") {
+      setListening(false);
+      return;
     }
-    if (newTgt) onChangeTgt(newTgt);
-    if (newSrc || newTgt) speech.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speech.finalText]);
+    type SRWindow = Window & {
+      SpeechRecognition?: new () => unknown;
+      webkitSpeechRecognition?: new () => unknown;
+    };
+    const w = window as SRWindow;
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) {
+      setListening(false);
+      return;
+    }
+    type SREvent = { results: { [i: number]: { [j: number]: { transcript: string } }; length: number } & {
+      [i: number]: { length: number };
+    } };
+    type SR = {
+      lang: string;
+      continuous: boolean;
+      interimResults: boolean;
+      maxAlternatives: number;
+      onresult: ((e: SREvent) => void) | null;
+      onend: (() => void) | null;
+      onerror: ((e: unknown) => void) | null;
+      start: () => void;
+      stop: () => void;
+      abort: () => void;
+    };
+    const r = new SR() as unknown as SR;
+    r.lang = lang;
+    r.continuous = false;
+    r.interimResults = false;
+    r.maxAlternatives = 3;
+
+    let matched = false;
+    r.onresult = (e: SREvent) => {
+      // Walk every alternative across every result for the best chance of a hit.
+      const candidates: string[] = [];
+      for (let i = 0; i < e.results.length; i++) {
+        const result = e.results[i];
+        for (let j = 0; j < result.length; j++) {
+          candidates.push(result[j].transcript);
+        }
+      }
+      for (const txt of candidates) {
+        const { src: ns, tgt: nt } = parseLangPair(txt);
+        if (ns || nt) {
+          matched = true;
+          if (ns) onChangeSrc(ns);
+          if (nt) onChangeTgt(nt);
+          if (ns) bumpPair(ns, nt ?? tgt);
+          queueRef.current = [];
+          setListening(false);
+          try { r.stop(); } catch { /* already stopping */ }
+          return;
+        }
+      }
+    };
+    r.onend = () => {
+      if (!matched) {
+        if (queueRef.current.length > 0) tryNext();
+        else setListening(false);
+      }
+    };
+    r.onerror = () => {
+      if (queueRef.current.length > 0) tryNext();
+      else setListening(false);
+    };
+
+    recRef.current = {
+      stop: () => { try { r.stop(); } catch { /* noop */ } },
+      abort: () => { try { r.abort(); } catch { /* noop */ } },
+    };
+    try { r.start(); } catch { tryNext(); }
+  }, [onChangeSrc, onChangeTgt, tgt]);
+
+  const start = () => {
+    if (!supported) return;
+    const browserLang =
+      typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
+    // Polyglot ladder: try the browser locale first, then English (if different).
+    const attempts = [browserLang];
+    if (!/^en/i.test(browserLang)) attempts.push("en-US");
+    queueRef.current = attempts;
+    setListening(true);
+    tryNext();
+  };
+
+  const stop = () => {
+    queueRef.current = [];
+    recRef.current?.abort();
+    setListening(false);
+  };
 
   if (!supported) return null;
 
   return (
     <button
       type="button"
-      onClick={() => {
-        if (speech.listening) {
-          speech.stop();
-        } else {
-          finalRef.current = "";
-          speech.reset();
-          speech.start();
-        }
-      }}
-      aria-pressed={speech.listening}
-      aria-label={
-        speech.listening ? "Listening for language pair…" : "Voice-pick language pair"
-      }
+      onClick={() => (listening ? stop() : start())}
+      aria-pressed={listening}
+      aria-label={listening ? "Listening for language pair…" : "Voice-pick language pair"}
       title={
-        speech.listening
-          ? "Say a pair, e.g. 'Swedish to English'"
-          : "Voice-pick language pair — say e.g. 'Spanish to English'"
+        listening
+          ? "Listening… say a pair like 'Swedish to English' or 'русский на английский'"
+          : "Voice-pick language pair (polyglot — say it in any of the 8 supported languages)"
       }
       className={`relative grid h-8 w-8 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
     >
-      {speech.listening && (
+      {listening && (
         <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/20 dark:bg-zinc-100/25" />
       )}
       <svg className="relative h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-        <path
-          d="M19 12a7 7 0 01-14 0M12 19v3M8 22h8"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
+        <path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" strokeWidth="2" />
+        <path d="M19 12a7 7 0 01-14 0M12 19v3M8 22h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       </svg>
       <DevBadge n="V" label="voice-pair" position="tr" />
     </button>
@@ -189,7 +257,7 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
-      <LangPairMic src={src} tgt={tgt} onChangeSrc={onChangeSrc} onChangeTgt={onChangeTgt} />
+      <LangPairMic tgt={tgt} onChangeSrc={onChangeSrc} onChangeTgt={onChangeTgt} />
       <LangChip
         lang={src}
         side="src"
