@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import LanguageBar from "@/components/LanguageBar";
+import DevBadge from "@/components/DevBadge";
 import { saveSession, updateSession, type Session } from "@/lib/history";
+import {
+  groupSentencesIntoParagraphs,
+  pairParagraphs,
+  splitSentences,
+  useAutoGrowTextarea,
+  useStickyBottom,
+} from "@/lib/segmenter";
 import {
   isIos,
   isSpeechRecognitionSupported,
@@ -13,6 +21,11 @@ import {
   useSpeechRecognition,
 } from "@/lib/speech";
 import { LANG_META, type Lang, type TranslateResult } from "@/lib/types";
+import { BTN_CHIP, BTN_CHIP_ACTIVE, BTN_HERO } from "@/lib/ui";
+
+/** Layout variant — determines how source/translation are rendered. */
+type View = "split" | "paragraph" | "stream";
+const VIEW_STORAGE_KEY = "translangai:view";
 
 type Props = {
   src: Lang;
@@ -79,6 +92,19 @@ export default function LiveTranslator({
   const savedSessionIdRef = useRef<string | null>(null);
   // When loading a session from history, suppress the next auto-translate.
   const skipNextTranslateRef = useRef(false);
+
+  // View selector — split / paragraph / stream — persisted per device.
+  const [view, setView] = useState<View>("split");
+  useEffect(() => {
+    const saved = (typeof localStorage !== "undefined" && localStorage.getItem(VIEW_STORAGE_KEY)) as View | null;
+    if (saved === "split" || saved === "paragraph" || saved === "stream") setView(saved);
+  }, []);
+  useEffect(() => {
+    if (typeof localStorage !== "undefined") localStorage.setItem(VIEW_STORAGE_KEY, view);
+  }, [view]);
+
+  // Auto-grow ref for the manual-text input (Split view).
+  const taRef = useAutoGrowTextarea(text);
 
   const ttsSupported = isTtsSupported();
   const asrSupported = isSpeechRecognitionSupported();
@@ -346,19 +372,101 @@ export default function LiveTranslator({
     savedSessionIdRef.current = null;
   }
 
+  const tgtText = translation?.primary && translation.primary !== "—" ? translation.primary : "";
+
+  // ── Shared button cluster (mic + speaker + clear) ────────────────────────
+  // Rendered into different positions per view (middle for Split, top for
+  // Paragraph/Stream). Memoised by JSX, not React.memo — components are cheap.
+  const controlCluster = (
+    <div className="relative flex items-center justify-center gap-5">
+      {/* Speaker / Stop-speaking */}
+      <button
+        type="button"
+        onClick={toggleTts}
+        disabled={!ttsSupported || (!isSpeaking && !tgtText)}
+        aria-label={isSpeaking ? "Stop speaking" : "Speak the translation"}
+        aria-pressed={isSpeaking}
+        className={`relative grid h-12 w-12 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
+      >
+        {isSpeaking ? <StopIcon className="h-5 w-5" /> : <SpeakerIcon className="h-5 w-5" />}
+        <DevBadge n={3} label="speak" />
+      </button>
+
+      {/* Mic / Stop-listening — hero element */}
+      <button
+        type="button"
+        onClick={speech.toggle}
+        disabled={!asrSupported}
+        aria-pressed={speech.listening}
+        aria-label={speech.listening ? "Stop listening" : "Start listening"}
+        className={`relative grid h-20 w-20 place-items-center rounded-full active:scale-95 ${BTN_HERO}`}
+      >
+        {/* Inner highlight ring — chip socket feel */}
+        <span aria-hidden className="pointer-events-none absolute inset-1.5 rounded-full border border-zinc-100/15 dark:border-zinc-900/15" />
+        {speech.listening && (
+          <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/20 dark:bg-zinc-100/25" />
+        )}
+        {speech.listening ? <StopIcon className="relative h-9 w-9" /> : <MicIcon className="relative h-8 w-8" />}
+        <DevBadge n={2} label="mic" />
+      </button>
+
+      {/* Clear */}
+      <button
+        type="button"
+        onClick={clearAll}
+        aria-label="Clear all"
+        className={`relative grid h-12 w-12 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
+      >
+        <TrashIcon className="h-5 w-5" />
+        <DevBadge n={4} label="clear" />
+      </button>
+    </div>
+  );
+
+  // ── Source field — used by Split view; auto-grows with content ────────────
+  const sourceField = speech.listening ? (
+    <p className="text-2xl leading-snug font-medium">
+      {speech.finalText}
+      {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
+      {!speech.finalText && !speech.interim && (
+        <span className="text-zinc-400">Listening…</span>
+      )}
+    </p>
+  ) : (
+    <textarea
+      ref={taRef}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      placeholder="Tap the mic or type here…"
+      rows={2}
+      className="block w-full resize-none bg-transparent text-2xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+    />
+  );
+
+  const targetField =
+    tgtText ? (
+      <p className="text-2xl leading-snug font-semibold">{tgtText}</p>
+    ) : translating ? (
+      <div className="space-y-2">
+        <div className="h-6 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-5 w-1/2 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
+      </div>
+    ) : (
+      <p className="text-2xl leading-snug text-zinc-400">…</p>
+    );
+
   return (
     <div className="flex flex-1 flex-col gap-4">
-      {/* Language bar + voice picker + auto-speak */}
+      {/* ── Toolbar row: language bar + view switcher + voice/auto-speak ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-        <LanguageBar src={src} tgt={tgt} onChangeSrc={setSrc} onChangeTgt={setTgt} onSwap={onSwap} />
+        <div className="relative">
+          <LanguageBar src={src} tgt={tgt} onChangeSrc={setSrc} onChangeTgt={setTgt} onSwap={onSwap} />
+          <DevBadge n={6} label="lang" />
+        </div>
         <div className="flex items-center gap-2">
+          <ViewSwitcher view={view} setView={setView} />
           {ttsSupported && voices.length > 0 && (
-            <VoicePicker
-              voices={voices}
-              value={voiceURI}
-              onChange={pickVoice}
-              tgt={tgt}
-            />
+            <VoicePicker voices={voices} value={voiceURI} onChange={pickVoice} tgt={tgt} />
           )}
           <button
             type="button"
@@ -366,129 +474,80 @@ export default function LiveTranslator({
             disabled={!ttsSupported}
             aria-pressed={autoSpeak}
             title={ttsSupported ? "Speak the translation aloud automatically (use headphones to avoid feedback)" : "TTS not supported"}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] transition-colors dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ${
-              autoSpeak
-                ? "border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
-            } disabled:opacity-40`}
+            className={`relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
+              autoSpeak ? BTN_CHIP_ACTIVE : BTN_CHIP
+            }`}
           >
             <SpeakerIcon className="h-3.5 w-3.5" />
             auto-speak
+            <DevBadge n={9} label="auto" position="tr" />
           </button>
         </div>
       </div>
 
-      {/* Source pane */}
-      <div className="relative flex-1 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 min-h-[120px]">
-        <FlagLabel lang={src} />
-        {speech.listening ? (
-          <p className="mt-2 text-2xl leading-snug font-medium">
-            {speech.finalText}
-            {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
-          </p>
-        ) : (
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={"Tap the mic or type here…"}
-            rows={2}
-            className="mt-2 block w-full resize-none bg-transparent text-2xl leading-snug font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
-          />
-        )}
-        {sourceText && (
-          <button
-            type="button"
-            onClick={clearAll}
-            aria-label="Clear"
-            className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      {/* Mic + Speak controls */}
-      <div className="flex items-center justify-center gap-6">
-        {/* Speaker / Stop-speaking button */}
-        <button
-          type="button"
-          onClick={toggleTts}
-          disabled={!ttsSupported || (!isSpeaking && (!translation?.primary || translation.primary === "—"))}
-          aria-label={isSpeaking ? "Stop speaking" : "Speak the translation"}
-          aria-pressed={isSpeaking}
-          className={`grid h-12 w-12 place-items-center rounded-full border shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors active:scale-95 disabled:opacity-40 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] ${
-            isSpeaking
-              ? "border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-              : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
-          }`}
-        >
-          {isSpeaking ? <StopIcon className="h-5 w-5" /> : <SpeakerIcon className="h-5 w-5" />}
-        </button>
-
-        {/* Mic / Stop-listening button — the Culture-y hero element */}
-        <button
-          type="button"
-          onClick={speech.toggle}
-          disabled={!asrSupported}
-          aria-pressed={speech.listening}
-          aria-label={speech.listening ? "Stop listening" : "Start listening"}
-          className={`relative grid h-20 w-20 place-items-center rounded-full border shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
-            speech.listening
-              ? "border-zinc-300 bg-zinc-50 text-zinc-900 ring-2 ring-zinc-900 ring-offset-2 ring-offset-zinc-50 dark:border-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:ring-zinc-100 dark:ring-offset-zinc-950"
-              : "border-zinc-100/20 bg-zinc-900 text-zinc-50 shadow-zinc-900/30 dark:border-zinc-900/40 dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-zinc-900/50"
-          }`}
-        >
-          {/* Inner highlight ring — chip socket feel */}
-          <span
-            aria-hidden
-            className={`pointer-events-none absolute inset-1 rounded-full ${
-              speech.listening
-                ? "border border-zinc-900/10 dark:border-zinc-900/20"
-                : "border border-zinc-100/15 dark:border-zinc-900/15"
-            }`}
-          />
-          {speech.listening && (
-            <span className="absolute inset-0 animate-ping rounded-full bg-zinc-900/15 dark:bg-zinc-100/20" />
-          )}
-          {speech.listening ? <StopIcon className="relative h-9 w-9" /> : <MicIcon className="relative h-8 w-8" />}
-        </button>
-
-        {/* Clear button */}
-        <button
-          type="button"
-          onClick={clearAll}
-          aria-label="Clear all"
-          className="grid h-12 w-12 place-items-center rounded-full border border-zinc-300 bg-white text-zinc-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] transition-colors hover:border-zinc-900 active:scale-95 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] dark:hover:border-zinc-100"
-        >
-          <TrashIcon className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Translation pane */}
-      <div className="relative flex-1 rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40 min-h-[140px]">
-        <FlagLabel lang={tgt} loading={translating} />
-        {translation?.primary && translation.primary !== "—" ? (
-          <p className="mt-2 text-2xl leading-snug font-semibold">{translation.primary}</p>
-        ) : translating ? (
-          <div className="mt-3 space-y-2">
-            <div className="h-6 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-            <div className="h-5 w-1/2 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
+      {/* ── View-specific layout ───────────────────────────────────────────── */}
+      {view === "split" && (
+        <>
+          {/* Source pane — content-sized, stays expanded when focus moves */}
+          <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <FlagLabel lang={src} />
+            <div className="mt-2">{sourceField}</div>
+            {sourceText && (
+              <button
+                type="button"
+                onClick={clearAll}
+                aria-label="Clear"
+                className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                ✕
+              </button>
+            )}
+            <DevBadge n={1} label="src" />
           </div>
-        ) : (
-          <p className="mt-2 text-2xl leading-snug text-zinc-400">…</p>
-        )}
-        {translation?.idiomatic?.note && (
-          <p className="mt-3 text-xs italic text-zinc-500">{translation.idiomatic.note}</p>
-        )}
-        {translation?.notes && translation.fallback && (
-          <p className="mt-3 text-[11px] text-zinc-400">{translation.notes}</p>
-        )}
-        {translation?.primary && translation.primary !== "—" && (
-          <p className="mt-2 text-[11px] text-zinc-400">
-            {wordCount(translation.primary)} words
-          </p>
-        )}
-      </div>
+
+          {controlCluster}
+
+          {/* Translation pane — content-sized */}
+          <div className="relative rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+            <FlagLabel lang={tgt} loading={translating} />
+            <div className="mt-2">{targetField}</div>
+            {translation?.idiomatic?.note && (
+              <p className="mt-3 text-xs italic text-zinc-500">{translation.idiomatic.note}</p>
+            )}
+            {translation?.notes && translation.fallback && (
+              <p className="mt-3 text-[11px] text-zinc-400">{translation.notes}</p>
+            )}
+            {tgtText && (
+              <p className="mt-2 text-[11px] text-zinc-400">{wordCount(tgtText)} words</p>
+            )}
+            <DevBadge n={5} label="tgt" />
+          </div>
+        </>
+      )}
+
+      {view === "paragraph" && (
+        <ParagraphLayout
+          src={src}
+          tgt={tgt}
+          sourceText={sourceText}
+          tgtText={tgtText}
+          interim={speech.listening ? speech.interim : ""}
+          translating={translating}
+          controls={controlCluster}
+        />
+      )}
+
+      {view === "stream" && (
+        <StreamLayout
+          src={src}
+          tgt={tgt}
+          sourceText={sourceText}
+          tgtText={tgtText}
+          interim={speech.listening ? speech.interim : ""}
+          translating={translating}
+          controls={controlCluster}
+        />
+      )}
 
       {/* Executive summary card */}
       {(summary || summarizing) && (
@@ -565,6 +624,207 @@ export default function LiveTranslator({
         {speech.error && <span className="font-mono text-zinc-900 dark:text-zinc-100">ERR · {speech.error}</span>}
       </div>
     </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// View switcher — three-way segmented control: split / paragraph / stream.
+// ──────────────────────────────────────────────────────────────────────────
+function ViewSwitcher({ view, setView }: { view: View; setView: (v: View) => void }) {
+  const items: Array<{ id: View; label: string; icon: React.ReactNode; title: string }> = [
+    {
+      id: "split",
+      label: "split",
+      title: "Top source pane, mic controls in the middle, bottom translation pane",
+      icon: (
+        <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" aria-hidden>
+          <rect x="1.5" y="2" width="11" height="3.5" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
+          <rect x="1.5" y="8.5" width="11" height="3.5" rx="0.6" stroke="currentColor" strokeWidth="1.1" />
+        </svg>
+      ),
+    },
+    {
+      id: "paragraph",
+      label: "pairs",
+      title: "Stacked paragraph pairs (source paragraph, then translation paragraph)",
+      icon: (
+        <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" aria-hidden>
+          <path d="M1.5 3h11M1.5 5h7M1.5 7H13M1.5 9h6M1.5 11h11" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      id: "stream",
+      label: "stream",
+      title: "Both panes scroll — only the latest input and translation lines stay in view",
+      icon: (
+        <svg viewBox="0 0 14 14" className="h-3.5 w-3.5" fill="none" aria-hidden>
+          <path d="M1.5 4h11M1.5 6h11M1.5 10h11" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+          <path d="M11 12l1.5-1.5L11 9" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+  ];
+  return (
+    <div className={`relative inline-flex rounded-full p-0.5 ${BTN_CHIP}`}>
+      {items.map((it) => {
+        const active = view === it.id;
+        return (
+          <button
+            key={it.id}
+            type="button"
+            onClick={() => setView(it.id)}
+            aria-pressed={active}
+            title={it.title}
+            className={`relative inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+              active ? BTN_CHIP_ACTIVE : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            {it.icon}
+            <span className="hidden sm:inline">{it.label}</span>
+          </button>
+        );
+      })}
+      <DevBadge n={7} label="view" />
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Paragraph layout — single column. Source paragraphs (sentence-grouped to
+// ~25 words each) stacked above thin rules with the matching translated
+// paragraph below. Auto-scrolls to bottom when content grows (sticks to
+// bottom unless the user has scrolled up).
+// ──────────────────────────────────────────────────────────────────────────
+function ParagraphLayout({
+  src,
+  tgt,
+  sourceText,
+  tgtText,
+  interim,
+  translating,
+  controls,
+}: {
+  src: Lang;
+  tgt: Lang;
+  sourceText: string;
+  tgtText: string;
+  interim: string;
+  translating: boolean;
+  controls: React.ReactNode;
+}) {
+  const srcPs = groupSentencesIntoParagraphs(splitSentences(sourceText));
+  const tgtPs = groupSentencesIntoParagraphs(splitSentences(tgtText));
+  const pairs = pairParagraphs(srcPs, tgtPs);
+  const scrollRef = useStickyBottom<HTMLDivElement>(sourceText.length + tgtText.length + interim.length);
+
+  return (
+    <>
+      <div className="relative flex items-center justify-between gap-2">
+        {controls}
+        <div className="hidden sm:flex flex-col items-end gap-0.5 text-right">
+          <FlagPair src={src} tgt={tgt} translating={translating} />
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="relative max-h-[60dvh] min-h-[40dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <DevBadge n={1} label="pairs" />
+        {pairs.length === 0 ? (
+          <p className="text-zinc-400">Tap the mic or type — paragraphs will appear here in pairs.</p>
+        ) : (
+          <ul className="space-y-6">
+            {pairs.map((p, i) => (
+              <li key={i} className="space-y-3">
+                <p className="text-[17px] leading-relaxed font-medium text-zinc-900 dark:text-zinc-100">
+                  <span className="mr-2 align-middle text-base leading-none">{LANG_META[src].flag}</span>
+                  {p.src || <span className="text-zinc-400">…</span>}
+                </p>
+                <hr className="border-t border-zinc-300/70 dark:border-zinc-700/70" />
+                <p className="text-[17px] leading-relaxed text-zinc-700 dark:text-zinc-300">
+                  <span className="mr-2 align-middle text-base leading-none">{LANG_META[tgt].flag}</span>
+                  {p.tgt || (translating ? <span className="text-zinc-400">translating…</span> : <span className="text-zinc-400">…</span>)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {interim && (
+          <p className="mt-4 text-[17px] leading-relaxed italic text-zinc-400">
+            <span className="mr-2 align-middle text-base leading-none">{LANG_META[src].flag}</span>
+            {interim}
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Stream layout — split top/bottom panes; both auto-scroll so the latest
+// source and translation lines stay in view (older content scrolls off the
+// top). Simultaneous-interpretation captions.
+// ──────────────────────────────────────────────────────────────────────────
+function StreamLayout({
+  src,
+  tgt,
+  sourceText,
+  tgtText,
+  interim,
+  translating,
+  controls,
+}: {
+  src: Lang;
+  tgt: Lang;
+  sourceText: string;
+  tgtText: string;
+  interim: string;
+  translating: boolean;
+  controls: React.ReactNode;
+}) {
+  const srcRef = useStickyBottom<HTMLDivElement>(sourceText.length + interim.length);
+  const tgtRef = useStickyBottom<HTMLDivElement>(tgtText.length);
+  return (
+    <>
+      {controls}
+
+      <div
+        ref={srcRef}
+        className="relative h-[28dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        <FlagLabel lang={src} />
+        <p className="mt-2 text-xl leading-snug font-medium">
+          {sourceText}
+          {interim && <span className="text-zinc-400"> {interim}</span>}
+          {!sourceText && !interim && <span className="text-zinc-400">Source…</span>}
+        </p>
+        <DevBadge n={1} label="src·stream" />
+      </div>
+
+      <div
+        ref={tgtRef}
+        className="relative h-[28dvh] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40"
+      >
+        <FlagLabel lang={tgt} loading={translating} />
+        <p className="mt-2 text-xl leading-snug font-semibold">
+          {tgtText || <span className="text-zinc-400">Translation…</span>}
+        </p>
+        <DevBadge n={5} label="tgt·stream" />
+      </div>
+    </>
+  );
+}
+
+function FlagPair({ src, tgt, translating }: { src: Lang; tgt: Lang; translating: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+      <span aria-hidden>{LANG_META[src].flag}</span>
+      <span aria-hidden>→</span>
+      <span aria-hidden>{LANG_META[tgt].flag}</span>
+      {translating && <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />}
+    </span>
   );
 }
 

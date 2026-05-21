@@ -1,12 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#09090b"/>
-  <rect x="20" y="20" width="472" height="472" rx="96" fill="none" stroke="#3f3f46" stroke-width="3"/>
-  <text x="50%" y="56%"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        font-family="ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
-        font-weight="900"
-        font-size="190"
-        letter-spacing="-10"
-        fill="#fafafa">T→T</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="chip" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#52525b"/>
+      <stop offset="55%" stop-color="#3f3f46"/>
+      <stop offset="100%" stop-color="#27272a"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fafafa"/>
+      <stop offset="100%" stop-color="#a1a1aa"/>
+    </linearGradient>
+  </defs>
+  <!-- Chip body -->
+  <rect width="64" height="64" rx="14" fill="url(#chip)"/>
+  <!-- Hairline frame -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="#a1a1aa" stroke-width="0.4" opacity="0.55"/>
+  <!-- Left arc (input side) -->
+  <path d="M 26 18 Q 18 32 26 46" stroke="url(#mark)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <!-- Right arc (output side) -->
+  <path d="M 38 18 Q 46 32 38 46" stroke="url(#mark)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <!-- Central transform node -->
+  <circle cx="32" cy="32" r="2.4" fill="url(#mark)"/>
+  <!-- IO trace lines -->
+  <line x1="8" y1="32" x2="18" y2="32" stroke="url(#mark)" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+  <line x1="46" y1="32" x2="56" y2="32" stroke="url(#mark)" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+  <!-- IO endpoint pads -->
+  <circle cx="8" cy="32" r="1.4" fill="url(#mark)"/>
+  <circle cx="56" cy="32" r="1.4" fill="url(#mark)"/>
 </svg>

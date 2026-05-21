@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.7)
+# TransLang AI — Design Specification (v0.8)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -322,7 +322,49 @@ Phase 2 (when first Tauri release matters): GitHub Actions matrix builds `macos-
 
 ---
 
-## 13. Open Questions (defaults chosen, easy to change)
+## 13. Live-translator views (v0.8)
+
+Three layouts toggle via a segmented pill in the toolbar. Choice is persisted per device in `localStorage` key `translangai:view`. A fourth column-pair view is planned.
+
+| View | When it's best | How it renders |
+|---|---|---|
+| **Split** (default) | Single thought / a few sentences. The mental model most users come in with. | Source pane (content-sized, auto-grows) → mic+speaker+clear cluster → translation pane (content-sized). Page scrolls; panes never collapse on blur. |
+| **Pairs** (Paragraph) | Long monologue you'll re-read later. | One scrollable column. Source sentence-split into ~25-word paragraphs; each paragraph rendered with a thin rule below it then the matching translated paragraph. Sticky-bottom auto-scroll. Mic cluster at top. |
+| **Stream** | Live interpretation while you talk continuously. | Two stacked fixed-height panes (28dvh each); both auto-scroll so the most-recent source line and most-recent translation line are always at the bottom of their pane. |
+| **Columns** (planned) | Tablet / desktop landscape, side-by-side proofreading. | Source on left, target on right, both scroll. |
+
+### Segmenting
+
+For Pairs view we don't make per-paragraph translation calls. Instead we sentence-split the *single full-text* translation that's already been returned and group sentences into ~25-word paragraphs, zipping source and target paragraphs by index. Counts won't always align (one source sentence can become two target sentences); the UI tolerates this by leaving the unmatched slot empty. Lives in `src/lib/segmenter.ts`.
+
+### Sticky-bottom scrolling
+
+`useStickyBottom(dep)` in `src/lib/segmenter.ts`. Tracks whether the container is within 24px of its bottom; if yes, content growth scrolls to bottom automatically. If the user scrolls up to read older content the auto-scroll yields — scrolling back down re-engages it.
+
+### Source pane no-collapse fix
+
+The earlier bug ("top pane shrinks when I click the bottom pane") came from both panes being `flex-1` inside a `flex-col` parent — they competed for vertical space, so focus shifts shifted the visible split. Fix: drop `flex-1` on both panes, let the page scroll naturally. The textarea grows with content via the callback-ref pattern in `useAutoGrowTextarea` (re-measures on both mount and value change).
+
+---
+
+## 14. DevBadges (dev / test only)
+
+Numbered overlays attached to every interactive component. Lets feedback reference parts by number ("in stream view, component 5 should…"). Strictly NODE_ENV-gated in `src/components/DevBadge.tsx` — Vercel production builds never render them. Local opt-out via `?nodev=1`.
+
+Number convention per view:
+- 1 = source pane / paragraph pairs list
+- 2 = mic button
+- 3 = speaker button
+- 4 = clear button
+- 5 = target pane
+- 6 = language bar
+- 7 = view switcher
+- 9 = auto-speak toggle
+- `H` = history button
+
+---
+
+## 15. Open Questions (defaults chosen, easy to change)
 
 1. **Mode**: Live or Compare on first open? — **Live**. Better demo, more delightful on phone.
 2. **Free mode default**: ON. Friend's deploy never bills him by accident.

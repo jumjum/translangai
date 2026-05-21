@@ -4,6 +4,30 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.8.0] — 2026-05-21
+
+### Added — three live-translator views
+
+- **View switcher** (toolbar, segmented 3-way pill) — `split` / `pairs` / `stream`. Choice persists per device in `localStorage:translangai:view`.
+- **Split view** (default, refactored): source pane / mic-cluster / translation pane, panes are **content-sized** (no more `flex-1` competition) so the source stays expanded when you click into the translation. Page scrolls naturally — Google-Translate-style.
+- **Paragraph (pairs) view**: single scrollable column. Source text is sentence-split and grouped into ~25-word paragraphs; each paragraph is shown with a thin rule below it followed by the matching translated paragraph. New pairs append and the view auto-scrolls to bottom (sticks to bottom unless the user scrolled up — they get to read in peace). Mic cluster at top, language pair chip at right.
+- **Stream view**: split top/bottom panes with fixed height (`28dvh` each); both auto-scroll so the most recent source line and the most recent translation line stay visible — older content scrolls off the top of each pane. Simultaneous-interpretation feel.
+
+### Added — Culture-glyph logo + grey-gradient buttons
+
+- New logo mark: two facing arc brackets (input / output sides) meeting at a central transform node, with thin IO trace lines and endpoint pads on the left / right edges. Abstract, no Latin letters — Culture-series ship-mark feel. Rolled out to `icon.svg`, `icon-maskable.svg`, the Next.js dynamic `icon.tsx` and `apple-icon.tsx`, and the header `Logo` component (which keeps a small chip-frame ring around the glyph).
+- New shared button recipes in `src/lib/ui.ts`: `BTN_HERO`, `BTN_CHIP`, `BTN_CHIP_ACTIVE`. Vertical grey gradients with a 1px inset highlight and a soft drop-shadow. Pressed state inverts the gradient and replaces the drop-shadow with an inset shadow — physical "chip pressed in" feel. Applied to the mic, speaker, clear, history button, mode switch, free-mode chip, view switcher, and auto-speak toggle. All dark-mode-aware.
+
+### Added — numbered DevBadges
+
+- New `DevBadge` component shows a small mono-numbered tag on each major UI element (`1 src`, `2 mic`, `3 speak`, `4 clear`, `5 tgt`, `6 lang`, `7 view`, `9 auto`, `H history`, etc). **NODE_ENV-gated** — never rendered in production builds. Toggle off in dev with `?nodev=1`. Lets the user reference components by number when filing feedback.
+
+### Fixed
+
+- **Source pane no longer collapses** when focus shifts to the translation pane. Both panes are now content-sized, the textarea auto-grows up to 12 lines (`useAutoGrowTextarea` callback-ref pattern re-measures on mount and value change), and the page scrolls — same model as Google Translate.
+
+---
+
 ## [0.7.0] — 2026-05-20
 
 ### Added — cross-platform foundation

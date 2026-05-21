@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import LiveTranslator from "@/components/LiveTranslator";
 import CompareView from "@/components/CompareView";
 import HistoryPanel from "@/components/HistoryPanel";
+import DevBadge from "@/components/DevBadge";
 import type { Session } from "@/lib/history";
 import type { Lang } from "@/lib/types";
+import { BTN_CHIP, BTN_CHIP_ACTIVE } from "@/lib/ui";
 
 type Mode = "live" | "compare";
 
@@ -63,9 +65,10 @@ export default function Home() {
             onClick={() => setHistoryOpen(true)}
             aria-label="Open history"
             title="History"
-            className="group relative grid h-9 w-9 place-items-center rounded-xl border border-zinc-300 bg-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] transition-colors hover:border-zinc-900 hover:bg-zinc-50 active:scale-95 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:hover:border-zinc-100 dark:hover:bg-zinc-800"
+            className={`relative grid h-9 w-9 place-items-center rounded-xl active:scale-95 ${BTN_CHIP}`}
           >
             <HistoryIcon className="h-4 w-4" />
+            <DevBadge n="H" label="history" />
           </button>
           <Logo />
         </div>
@@ -128,32 +131,25 @@ function HistoryIcon({ className }: { className?: string }) {
 }
 
 function ModeSwitch({ mode, setMode }: { mode: "live" | "compare"; setMode: (m: "live" | "compare") => void }) {
+  const tab = (id: "live" | "compare", label: string) => {
+    const active = mode === id;
+    return (
+      <button
+        type="button"
+        onClick={() => setMode(id)}
+        aria-pressed={active}
+        className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+          active ? BTN_CHIP_ACTIVE : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
   return (
-    <div className="relative inline-flex rounded-full border border-zinc-300 bg-white p-1 text-xs font-medium shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-      <button
-        type="button"
-        onClick={() => setMode("live")}
-        aria-pressed={mode === "live"}
-        className={`rounded-full px-3 py-1.5 transition-colors ${
-          mode === "live"
-            ? "bg-zinc-900 text-zinc-50 shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        }`}
-      >
-        Live
-      </button>
-      <button
-        type="button"
-        onClick={() => setMode("compare")}
-        aria-pressed={mode === "compare"}
-        className={`rounded-full px-3 py-1.5 transition-colors ${
-          mode === "compare"
-            ? "bg-zinc-900 text-zinc-50 shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
-            : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        }`}
-      >
-        Compare
-      </button>
+    <div className={`relative inline-flex rounded-full p-1 ${BTN_CHIP}`}>
+      {tab("live", "Live")}
+      {tab("compare", "Compare")}
     </div>
   );
 }
@@ -165,15 +161,13 @@ function FreeModeChip({ freeMode, setFreeMode }: { freeMode: boolean; setFreeMod
       onClick={() => setFreeMode(!freeMode)}
       aria-pressed={freeMode}
       title={freeMode ? "Only free providers will be called (no API costs)." : "Paid providers (DeepL / LLM) are enabled."}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)] transition-colors dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ${
-        freeMode
-          ? "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-100"
-          : "border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] ${
+        freeMode ? BTN_CHIP : BTN_CHIP_ACTIVE
       }`}
     >
       <span
         className={`h-1.5 w-1.5 rounded-full ${
-          freeMode ? "bg-zinc-400 dark:bg-zinc-500" : "bg-zinc-50 dark:bg-zinc-900"
+          freeMode ? "bg-zinc-500 dark:bg-zinc-400" : "bg-zinc-50 dark:bg-zinc-900"
         }`}
       />
       {freeMode ? "FREE" : "PAID"}
@@ -186,21 +180,23 @@ function Logo() {
     <div className="flex items-center gap-2.5">
       <span
         aria-hidden
-        className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-zinc-300 bg-zinc-900 text-zinc-50 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18)] dark:border-zinc-100/20 dark:bg-zinc-100 dark:text-zinc-900"
+        className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-zinc-600 via-zinc-700 to-zinc-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_8px_rgba(0,0,0,0.25)] ring-1 ring-zinc-400/40 dark:ring-zinc-300/30"
       >
-        {/* Hairline corner trace — chip pin */}
-        <span className="pointer-events-none absolute left-1 top-1 h-1 w-1 border-l border-t border-current opacity-50" />
-        <span className="pointer-events-none absolute right-1 bottom-1 h-1 w-1 border-r border-b border-current opacity-50" />
-        {/* T → T mark */}
-        <svg viewBox="0 0 28 28" className="relative h-5 w-5" fill="none" aria-hidden>
-          <text x="3" y="11" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="11" fill="currentColor">T</text>
-          <path d="M10 14h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M17 11.5l3 2.5-3 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          <text x="18" y="25" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="11" fill="currentColor">T</text>
+        {/* Hairline inner frame — gives the chip a "machined" edge */}
+        <span className="pointer-events-none absolute inset-[2px] rounded-[9px] border border-zinc-400/35" />
+        {/* Culture-glyph: two arc brackets + center node + IO traces */}
+        <svg viewBox="0 0 64 64" className="relative h-6 w-6" fill="none" aria-hidden>
+          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="2.2" fill="#fafafa" />
+          <line x1="10" y1="32" x2="18" y2="32" stroke="#fafafa" strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+          <line x1="46" y1="32" x2="54" y2="32" stroke="#fafafa" strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+          <circle cx="10" cy="32" r="1.3" fill="#fafafa" />
+          <circle cx="54" cy="32" r="1.3" fill="#fafafa" />
         </svg>
       </span>
       <div className="flex flex-col leading-tight">
-        <h1 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-lg">
+        <h1 className="bg-gradient-to-b from-zinc-700 to-zinc-950 bg-clip-text text-base font-bold tracking-tight text-transparent sm:text-lg dark:from-zinc-100 dark:to-zinc-400">
           TransLang&nbsp;AI
         </h1>
         <span className="system-label hidden text-zinc-500 sm:inline">omni · translator</span>
