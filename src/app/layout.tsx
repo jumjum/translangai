@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import BackgroundGrid from "@/components/BackgroundGrid";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-sans", subsets: ["latin", "cyrillic"] });
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={`${inter.variable} ${jbMono.variable} antialiased`}>
       <body className="relative min-h-dvh bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
         <BackgroundGrid />
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>
