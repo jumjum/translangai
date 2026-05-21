@@ -4,6 +4,25 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.11.2] — 2026-05-22
+
+### Added
+- **Combined two-column language picker**. Clicking either chip opens one dropdown with `[SOURCE] [↔] [TARGET]` columns and a reversible direction arrow in the middle. Pick both sides in one interaction instead of two open-close cycles. Each column independently sorted by usage frequency.
+- **Per-field copy + speak actions**. Bottom-right of each text field (source and target). The speaker reads the *field's own text* in its own language — distinct from the toolbar auto-speak which is continuous while typing. Tiny 7px buttons, faded until hover.
+- **Newline preservation**. `whitespace-pre-wrap` on both source and target renderings so Enter key carries through to layout. Translation engines preserve `\n` in most cases (DeepL definitively; MyMemory and Lingva usually).
+- **3 s speech-pause auto-commit** restored in Pairs view (per feedback — you wanted to evaluate it). Pairs now commit on `.?!` + 20 words, or 60-word run-on cap, or double-Enter, or 3 s silence with ≥ 5 words.
+
+### Fixed
+- **Source pane no longer pushes the target off-screen** when long content is typed. Both Split-view panes capped at `max-h-[35dvh]` with internal scroll. The translation stays in view while typing.
+
+### Spec'd (implementation queued)
+- §15 **Transcription mode**: picking the same language for src and tgt switches to a single-pane voice/file transcription UI. Same components recomposed — mic, summary endpoint, copy/speak. v0.12.
+- §16 **Universal input**: drag-drop files (text, audio, PDF, image), paste URLs (YouTube, podcasts). Whisper for audio. Image OCR via Tesseract.js. v0.13.
+- §17 **Competitive landscape** snapshot — moat (multi-source compare, four view modes, zero-account default, voice-pair, scrolling-teleprompter Pairs view) + actual gaps (no camera-OCR, no native mobile yet).
+- §18 **Monetization ladder** — Free today; Pro ($5–8/mo) when Vercel quota / LLM inclusion / Whisper become unavoidable, not before. Premature monetization kills growth on tools like this.
+
+---
+
 ## [0.11.0] — 2026-05-21
 
 ### Added — Pairs view rebuilt as a scrolling teleprompter (per DESIGN §13.1)

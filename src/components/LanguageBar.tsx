@@ -18,17 +18,9 @@ type Props = {
 };
 
 /**
- * Voice-pick language pair — "polyglot" mode.
- *
- * The browser's SpeechRecognition needs a single language per session, so
- * we run sequential attempts: first in `navigator.language`, then in
- * `en-US` if the first attempt's transcript didn't parse to any known
- * language name. That covers two of the most likely speaker profiles
- * (native speaker + English speaker) on a single click.
- *
- * The alias table in `src/lib/langNames.ts` already contains language
- * names spelled in all 8 supported tongues, so a single successful
- * transcription is usually enough.
+ * Voice-pick language pair — polyglot mode. Two sequential recognition
+ * attempts (browser locale → en-US) so the user can speak the pair in any
+ * supported language and the multilingual alias table parses it.
  */
 function LangPairMic({
   tgt,
@@ -60,9 +52,12 @@ function LangPairMic({
       setListening(false);
       return;
     }
-    type SREvent = { results: { [i: number]: { [j: number]: { transcript: string } }; length: number } & {
-      [i: number]: { length: number };
-    } };
+    type SREvent = {
+      results: {
+        [i: number]: { [j: number]: { transcript: string } } & { length: number };
+        length: number;
+      };
+    };
     type SR = {
       lang: string;
       continuous: boolean;
@@ -83,7 +78,6 @@ function LangPairMic({
 
     let matched = false;
     r.onresult = (e: SREvent) => {
-      // Walk every alternative across every result for the best chance of a hit.
       const candidates: string[] = [];
       for (let i = 0; i < e.results.length; i++) {
         const result = e.results[i];
@@ -100,7 +94,7 @@ function LangPairMic({
           if (ns) bumpPair(ns, nt ?? tgt);
           queueRef.current = [];
           setListening(false);
-          try { r.stop(); } catch { /* already stopping */ }
+          try { r.stop(); } catch { /* noop */ }
           return;
         }
       }
@@ -115,7 +109,6 @@ function LangPairMic({
       if (queueRef.current.length > 0) tryNext();
       else setListening(false);
     };
-
     recRef.current = {
       stop: () => { try { r.stop(); } catch { /* noop */ } },
       abort: () => { try { r.abort(); } catch { /* noop */ } },
@@ -127,7 +120,6 @@ function LangPairMic({
     if (!supported) return;
     const browserLang =
       typeof navigator !== "undefined" && navigator.language ? navigator.language : "en-US";
-    // Polyglot ladder: try the browser locale first, then English (if different).
     const attempts = [browserLang];
     if (!/^en/i.test(browserLang)) attempts.push("en-US");
     queueRef.current = attempts;
@@ -169,109 +161,179 @@ function LangPairMic({
 }
 
 /**
- * Language picker chip. Two-column dropdown sorted by usage frequency.
+ * Combined two-column language picker.
  *
- * Click opens. Click an option picks. Outside click / Escape closes.
- * Mouse movement does nothing.
+ * One dropdown serves both source and target chips. Left column = source
+ * choices, middle = direction arrow (clickable to swap), right column =
+ * target choices. Saves a click vs. the old "open src, pick, close, open
+ * tgt, pick, close" flow. Each column is sorted by usage frequency
+ * (rankLangs from langPairStats).
+ *
+ * Source column disables the current target lang, and vice versa — you
+ * can't pick the same language for both sides (use Transcription mode
+ * for that).
  */
-function LangChip({
-  lang,
-  side,
-  open,
-  onToggle,
+function CombinedPicker({
+  src,
+  tgt,
+  onChangeSrc,
+  onChangeTgt,
+  onSwap,
   onClose,
-  onPick,
-  excluded,
-  label,
 }: {
-  lang: Lang;
-  side: "src" | "tgt";
-  open: boolean;
-  onToggle: () => void;
+  src: Lang;
+  tgt: Lang;
+  onChangeSrc: (l: Lang) => void;
+  onChangeTgt: (l: Lang) => void;
+  onSwap: () => void;
   onClose: () => void;
-  onPick: (l: Lang) => void;
-  excluded?: Lang;
-  label: string;
 }) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  useClickAway(wrapRef, open, onClose);
-
-  // Compute the sort only when the dropdown opens — avoids reading localStorage
-  // on every render of every chip on every keystroke.
-  const ranked = open ? rankLangs(side) : [];
+  const srcRanked = rankLangs("src");
+  const tgtRanked = rankLangs("tgt");
 
   return (
-    <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`${label}: ${LANG_META[lang].name}`}
-        className={`group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium active:scale-[0.98] ${BTN_CHIP}`}
-      >
-        <span className="text-base leading-none">{LANG_META[lang].flag}</span>
-        <span>{LANG_META[lang].native}</span>
-        <svg
-          width="10"
-          height="6"
-          viewBox="0 0 10 6"
-          className={`opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
-        >
-          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-        </svg>
-      </button>
-      {open && (
-        <div
-          role="listbox"
-          aria-label={label}
-          className="absolute left-0 top-full z-30 mt-2 w-[19rem] grid grid-cols-2 gap-0 overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
-        >
-          {ranked.map((l) => (
-            <button
-              key={l}
-              type="button"
-              disabled={l === excluded}
-              onClick={() => onPick(l)}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 ${
-                l === lang
-                  ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-100"
-                  : ""
-              }`}
-              role="option"
-              aria-selected={l === lang}
-            >
-              <span className="text-base">{LANG_META[l].flag}</span>
-              <span className="truncate">{LANG_META[l].native}</span>
-            </button>
+    <div
+      role="dialog"
+      aria-label="Choose language pair"
+      className="absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2 w-[22rem] sm:w-[26rem] overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
+    >
+      <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-zinc-200 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+        <span className="text-left">Source</span>
+        <span aria-hidden>·</span>
+        <span className="text-right">Target</span>
+      </header>
+      <div className="grid grid-cols-[1fr_auto_1fr]">
+        {/* Left — source column */}
+        <ul className="border-r border-zinc-200 dark:border-zinc-800">
+          {srcRanked.map((l) => (
+            <li key={`src-${l}`}>
+              <button
+                type="button"
+                disabled={l === tgt}
+                onClick={() => {
+                  onChangeSrc(l);
+                  bumpPair(l, tgt);
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 ${
+                  l === src
+                    ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-100"
+                    : ""
+                }`}
+                role="option"
+                aria-selected={l === src}
+              >
+                <span className="text-base leading-none">{LANG_META[l].flag}</span>
+                <span className="truncate">{LANG_META[l].native}</span>
+              </button>
+            </li>
           ))}
+        </ul>
+
+        {/* Middle — direction arrow, click to reverse */}
+        <div className="flex flex-col items-center justify-center px-2">
+          <button
+            type="button"
+            onClick={onSwap}
+            aria-label="Reverse translation direction"
+            title="Reverse direction (and swap text)"
+            className={`grid h-9 w-9 place-items-center rounded-full active:scale-95 ${BTN_CHIP}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden>
+              <path
+                d="M3 4h8m0 0L8 1m3 3L8 7M11 10H3m0 0l3 3m-3-3l3-3"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
-      )}
+
+        {/* Right — target column */}
+        <ul>
+          {tgtRanked.map((l) => (
+            <li key={`tgt-${l}`}>
+              <button
+                type="button"
+                disabled={l === src}
+                onClick={() => {
+                  onChangeTgt(l);
+                  bumpPair(src, l);
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 ${
+                  l === tgt
+                    ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-100"
+                    : ""
+                }`}
+                role="option"
+                aria-selected={l === tgt}
+              >
+                <span className="text-base leading-none">{LANG_META[l].flag}</span>
+                <span className="truncate">{LANG_META[l].native}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <footer className="border-t border-zinc-200 px-3 py-1.5 text-[10px] text-zinc-400 dark:border-zinc-800">
+        Click a language to pick it. Click both columns to change the whole pair in one go.
+        <button
+          type="button"
+          onClick={onClose}
+          className="float-right text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+        >
+          Done
+        </button>
+      </footer>
     </div>
   );
 }
 
+function LangChip({
+  lang,
+  onClick,
+  open,
+  label,
+}: {
+  lang: Lang;
+  onClick: () => void;
+  open: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label={`${label}: ${LANG_META[lang].name}`}
+      className={`group inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium active:scale-[0.98] ${BTN_CHIP}`}
+    >
+      <span className="text-base leading-none">{LANG_META[lang].flag}</span>
+      <span>{LANG_META[lang].native}</span>
+      <svg
+        width="10"
+        height="6"
+        viewBox="0 0 10 6"
+        className={`opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
+      >
+        <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
 export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap }: Props) {
-  const [open, setOpen] = useState<"src" | "tgt" | null>(null);
-  const close = () => setOpen(null);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  useClickAway(wrapRef, open, () => setOpen(false));
 
   return (
-    <div className="flex items-center gap-1.5 sm:gap-2">
+    <div ref={wrapRef} className="relative flex items-center gap-1.5 sm:gap-2">
       <LangPairMic tgt={tgt} onChangeSrc={onChangeSrc} onChangeTgt={onChangeTgt} />
-      <LangChip
-        lang={src}
-        side="src"
-        label="Source language"
-        open={open === "src"}
-        onToggle={() => setOpen(open === "src" ? null : "src")}
-        onClose={close}
-        excluded={tgt}
-        onPick={(l) => {
-          onChangeSrc(l);
-          bumpPair(l, tgt);
-          close();
-        }}
-      />
+      <LangChip lang={src} label="Source language" open={open} onClick={() => setOpen(!open)} />
       <button
         type="button"
         onClick={() => {
@@ -293,20 +355,21 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
           />
         </svg>
       </button>
-      <LangChip
-        lang={tgt}
-        side="tgt"
-        label="Target language"
-        open={open === "tgt"}
-        onToggle={() => setOpen(open === "tgt" ? null : "tgt")}
-        onClose={close}
-        excluded={src}
-        onPick={(l) => {
-          onChangeTgt(l);
-          bumpPair(src, l);
-          close();
-        }}
-      />
+      <LangChip lang={tgt} label="Target language" open={open} onClick={() => setOpen(!open)} />
+
+      {open && (
+        <CombinedPicker
+          src={src}
+          tgt={tgt}
+          onChangeSrc={onChangeSrc}
+          onChangeTgt={onChangeTgt}
+          onSwap={() => {
+            onSwap();
+            bumpPair(tgt, src);
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </div>
   );
 }

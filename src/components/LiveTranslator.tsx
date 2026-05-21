@@ -380,6 +380,7 @@ export default function LiveTranslator({
     setText("");
     setTranslation(null);
     setSummary(null);
+    setPairsCommitted([]);
     lastSpokenRef.current = "";
     lastSpeakAtRef.current = 0;
     sessionStartRef.current = null;
@@ -440,10 +441,12 @@ export default function LiveTranslator({
   // ── Source field — used by Split view ─────────────────────────────────────
   // Wrapped in a min-height container so toggling between the live transcript
   // <p> and the editable <textarea> doesn't visually shrink the source pane.
+  // whitespace-pre-wrap preserves user-typed newlines (return key carries
+  // through to layout) so the source text reads the way it was written.
   const sourceField = (
     <div className="min-h-[4.5rem]">
       {speech.listening ? (
-        <p className="text-2xl leading-snug font-medium">
+        <p className="text-2xl leading-snug font-medium whitespace-pre-wrap">
           {speech.finalText}
           {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
           {!speech.finalText && !speech.interim && (
@@ -467,7 +470,7 @@ export default function LiveTranslator({
 
   const targetField =
     tgtText ? (
-      <p className="text-2xl leading-snug font-semibold">{tgtText}</p>
+      <p className="text-2xl leading-snug font-semibold whitespace-pre-wrap">{tgtText}</p>
     ) : translating ? (
       <div className="space-y-2">
         <div className="h-6 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
@@ -508,11 +511,24 @@ export default function LiveTranslator({
       {/* ── View-specific layout ───────────────────────────────────────────── */}
       {view === "split" && (
         <>
-          {/* Source pane — content-sized, stays expanded when focus moves */}
-          <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          {/* Source pane — capped at ~35dvh so it never pushes the target
+              pane below the fold. Internal scroll once content exceeds. */}
+          <div className="relative max-h-[35dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 pb-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <FlagLabel lang={src} />
-            <div className="mt-2">{sourceField}</div>
-            {sourceText && (
+            {pairsCommitted.length > 0 && (
+              <div className="mt-2 space-y-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+                {pairsCommitted.map((p) => (
+                  <p
+                    key={p.id}
+                    className="text-[17px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300"
+                  >
+                    {p.src}
+                  </p>
+                ))}
+              </div>
+            )}
+            <div className={pairsCommitted.length > 0 ? "mt-3" : "mt-2"}>{sourceField}</div>
+            {(sourceText || pairsCommitted.length > 0) && (
               <button
                 type="button"
                 onClick={clearAll}
@@ -522,15 +538,32 @@ export default function LiveTranslator({
                 ✕
               </button>
             )}
+            <FieldActions
+              text={[...pairsCommitted.map((p) => p.src), sourceText].filter(Boolean).join("\n\n")}
+              lang={src}
+              ttsSupported={ttsSupported}
+            />
             <DevBadge n={1} label="src" />
           </div>
 
           {controlCluster}
 
-          {/* Translation pane — content-sized */}
-          <div className="relative rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+          {/* Translation pane — capped same as source. */}
+          <div className="relative max-h-[35dvh] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
             <FlagLabel lang={tgt} loading={translating} />
-            <div className="mt-2">{targetField}</div>
+            {pairsCommitted.length > 0 && (
+              <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
+                {pairsCommitted.map((p) => (
+                  <p
+                    key={p.id}
+                    className="text-[17px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300"
+                  >
+                    {p.tgt || <span className="text-zinc-400">…</span>}
+                  </p>
+                ))}
+              </div>
+            )}
+            <div className={pairsCommitted.length > 0 ? "mt-3" : "mt-2"}>{targetField}</div>
             {translation?.idiomatic?.note && (
               <p className="mt-3 text-xs italic text-zinc-500">{translation.idiomatic.note}</p>
             )}
@@ -540,6 +573,11 @@ export default function LiveTranslator({
             {tgtText && (
               <p className="mt-2 text-[11px] text-zinc-400">{wordCount(tgtText)} words</p>
             )}
+            <FieldActions
+              text={[...pairsCommitted.map((p) => p.tgt), tgtText].filter(Boolean).join("\n\n")}
+              lang={tgt}
+              ttsSupported={ttsSupported}
+            />
             <DevBadge n={5} label="tgt" />
           </div>
         </>
@@ -572,6 +610,7 @@ export default function LiveTranslator({
           interim={speech.listening ? speech.interim : ""}
           isListening={speech.listening}
           translating={translating}
+          committed={pairsCommitted}
           controls={controlCluster}
         />
       )}
@@ -784,12 +823,16 @@ function ParagraphLayout({
     setText("");
   }, [text, tgtText, setText, setCommitted]);
 
+  const lastTypedRef = useRef(Date.now());
+
   // ── Commit triggers ─────────────────────────────────────────────────────
   // (a) Sentence-end punctuation + ≥ 20 words, OR
-  // (b) ≥ 60 words even without terminal punctuation (run-on guard).
-  // (c) Double-Enter — see onKeyDown below.
+  // (b) ≥ 60 words even without terminal punctuation (run-on guard), OR
+  // (c) ≥ 3 s of mic silence with ≥ 5 words (speech pause), OR
+  // (d) Double-Enter — see onKeyDown below.
   // Runs whenever the source text changes.
   useEffect(() => {
+    lastTypedRef.current = Date.now();
     const words = wc(text);
     if (words >= 60) {
       commit();
@@ -801,7 +844,18 @@ function ParagraphLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
 
-  // (c) Double-Enter — explicit hard break. Handled in onKeyDown so we can
+  // Speech-pause auto-commit (re-enabled per user feedback v0.11.2).
+  useEffect(() => {
+    if (!isListening) return;
+    const id = setTimeout(() => {
+      if (wc(text) >= 5 && Date.now() - lastTypedRef.current >= 3000) {
+        commit();
+      }
+    }, 3100);
+    return () => clearTimeout(id);
+  }, [text, interim, isListening, commit]);
+
+  // Double-Enter — explicit hard break. Handled in onKeyDown so we can
   // preventDefault and avoid leaving stray newlines in the source field.
   const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -923,6 +977,7 @@ function StreamLayout({
   interim,
   isListening,
   translating,
+  committed,
   controls,
 }: {
   src: Lang;
@@ -934,6 +989,7 @@ function StreamLayout({
   interim: string;
   isListening: boolean;
   translating: boolean;
+  committed: Pair[];
   controls: React.ReactNode;
 }) {
   const srcRef = useRef<HTMLDivElement | null>(null);
@@ -995,10 +1051,20 @@ function StreamLayout({
         className="relative flex flex-col overflow-hidden rounded-2xl border border-zinc-300 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
         style={{ height: "min(60dvh, 640px)" }}
       >
-        {/* Top: source — editable when not listening, live transcript when listening. */}
+        {/* Top: source — committed paragraphs (read-only), then editable
+            active textarea (or live transcript when listening). */}
         <div ref={srcRef} className="relative flex-1 overflow-y-auto px-4 py-3">
           <FlagLabel lang={src} />
-          <div className="mt-1.5">
+          {committed.length > 0 && (
+            <div className="mt-2 space-y-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+              {committed.map((p) => (
+                <p key={p.id} className="text-xl leading-snug whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                  {p.src}
+                </p>
+              ))}
+            </div>
+          )}
+          <div className={committed.length > 0 ? "mt-3" : "mt-1.5"}>
             {isListening ? (
               <p className="text-xl leading-snug font-medium">
                 {sourceText}
@@ -1024,10 +1090,19 @@ function StreamLayout({
         {/* Thin rule between source and translation halves. */}
         <hr className="border-t border-zinc-200 dark:border-zinc-800" aria-hidden />
 
-        {/* Bottom: translation. */}
+        {/* Bottom: translation — committed paragraphs above, active below. */}
         <div ref={tgtRef} className="relative flex-1 overflow-y-auto px-4 py-3 bg-zinc-50/60 dark:bg-zinc-800/30">
           <FlagLabel lang={tgt} loading={translating} />
-          <p className="mt-1.5 text-xl leading-snug font-semibold">
+          {committed.length > 0 && (
+            <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
+              {committed.map((p) => (
+                <p key={p.id} className="text-xl leading-snug whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                  {p.tgt || <span className="text-zinc-400">…</span>}
+                </p>
+              ))}
+            </div>
+          )}
+          <p className={`text-xl leading-snug font-semibold ${committed.length > 0 ? "mt-3" : "mt-1.5"}`}>
             {tgtText || <span className="text-zinc-400 font-normal">Translation will appear here…</span>}
           </p>
           <DevBadge n={5} label="tgt·stream" />
@@ -1037,6 +1112,86 @@ function StreamLayout({
   );
 }
 
+
+/**
+ * Per-field action row — copy + speak. Sits in the bottom-right of each
+ * text field so the field's content can be exported with one tap. Distinct
+ * from the toolbar speaker which controls *continuous* auto-speak.
+ */
+function FieldActions({
+  text,
+  lang,
+  ttsSupported,
+}: {
+  text: string;
+  lang: Lang;
+  ttsSupported: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  const onCopy = () => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
+  };
+  const onSpeak = () => {
+    if (!text || !ttsSupported) return;
+    if (speaking) {
+      stopSpeaking();
+      setSpeaking(false);
+      return;
+    }
+    speak(text, LANG_META[lang].tts, {
+      onStart: () => setSpeaking(true),
+      onEnd: () => setSpeaking(false),
+      onError: () => setSpeaking(false),
+    });
+  };
+
+  if (!text) return null;
+  return (
+    <div className="absolute bottom-2 right-2 flex items-center gap-0.5 opacity-60 transition-opacity hover:opacity-100">
+      <button
+        type="button"
+        onClick={onSpeak}
+        disabled={!ttsSupported}
+        aria-label={speaking ? "Stop speaking" : `Speak in ${LANG_META[lang].name}`}
+        title={speaking ? "Stop speaking" : `Speak (${LANG_META[lang].name})`}
+        className={`grid h-7 w-7 place-items-center rounded ${BTN_CHIP}`}
+      >
+        {speaking ? (
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden>
+            <path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M16 8a5 5 0 010 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onCopy}
+        aria-label={copied ? "Copied" : "Copy text"}
+        title={copied ? "Copied!" : "Copy"}
+        className={`grid h-7 w-7 place-items-center rounded ${BTN_CHIP}`}
+      >
+        {copied ? (
+          <span className="text-[10px] font-mono">✓</span>
+        ) : (
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+            <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M3 11V4.5A1.5 1.5 0 0 1 4.5 3H10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
 
 function FlagLabel({ lang, loading }: { lang: Lang; loading?: boolean }) {
   return (

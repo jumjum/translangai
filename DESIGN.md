@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.11)
+# TransLang AI — Design Specification (v0.11.2)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -421,9 +421,125 @@ Number convention per view:
 
 ---
 
-## 15. Open Questions (defaults chosen, easy to change)
+## 15. Transcription mode (queued — design only, implementation v0.12)
+
+**Trigger:** picking the same language for source and target in the new combined picker switches the UI into a single-pane transcription mode. No translation is performed — the user is just dictating, capturing audio, or ingesting an audio file for transcription.
+
+**Layout:**
+
+```
+┌─────────────────────────────────────────┐
+│ Toolbar: [pair-mic] [🇸🇪 → 🇸🇪]          │
+├─────────────────────────────────────────┤
+│            ●   ▶                        │  ← mic + (optional) playback
+│         live transcription              │
+├─────────────────────────────────────────┤
+│ 🇸🇪 Svenska                              │
+│ … transcribed text grows here …         │
+│                       [▶ speak] [⎘ copy]│
+│                       [Σ summarise]     │
+└─────────────────────────────────────────┘
+```
+
+**Input sources** (one click each in the mic cluster):
+- **Mic** — live voice capture (current Web Speech path). Largest button, central.
+- **Drop a file** — text or audio. Audio gets sent to a transcription service (Whisper API at ~$0.006/min when we wire it, see §17). Text is pasted as-is.
+- **Paste a URL** — streaming source (YouTube link, podcast feed, direct audio URL). Resolved client-side when possible, server-side when not.
+- **Paste text** — keyboard paste lands in the field; nothing special needed.
+
+**Buttons exposed:**
+- Mic toggle (start/stop) — large.
+- Copy field text — small, bottom-right of the field.
+- Speak field text — small, beside Copy.
+- **Summarise** — sends the transcribed text to `/api/summarize` (already exists). Produces an executive summary card below the transcript.
+
+**Why this matters:** transcription is the second most common voice-text workflow after translation. Adding it costs essentially zero — we already have the recogniser, the summary endpoint, the copy/speak actions, the history sidebar — they just compose differently when src===tgt. The user already wanted "voice memo with one button"; this gives them that *and* the same UI doubles as a translation transcript view (if they later swap target away from source, the transcript becomes the source of a translation).
+
+**Implementation outline:**
+1. Detect same-language pair in `LiveTranslator` and switch view to a new `TranscribeLayout` that doesn't render a target pane.
+2. Hook up `summary` state (already used by Pairs auto-summary) to a manual button.
+3. File / URL ingestion handled in §17.
+
+---
+
+## 16. Universal input — files, URLs, drag-drop (queued, v0.13)
+
+The Live source field becomes a drop zone (HTML5 `dragover`/`drop` events) accepting:
+
+| Drop | Action |
+|---|---|
+| **Text file** (`.txt`, `.md`, `.srt`, `.vtt`) | Read with `FileReader.readAsText`, inject into the source. |
+| **Audio file** (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.webm`) | Upload to `/api/transcribe` → Whisper. Result lands in the source field. Play button appears beside the file name so the user can scrub. |
+| **PDF** | Extract text via `pdfjs-dist` (already a peer dep of many tools, ~200KB gzipped). Inject. |
+| **YouTube / podcast URL** | Backend fetches caption track if available (free); else queues a Whisper transcription (paid). |
+| **Image** | OCR via Tesseract.js (client-side, free, slow). Phase-2. |
+
+Visual feedback: file chip appears in the source field with name + size + ✕ remove. While transcribing, the chip shows a small progress ring.
+
+This is the *single feature* most distinguishes us from Google Translate, which only accepts typed/spoken text in the same session. We become a universal in-tray for any translation/transcription task.
+
+**Cost gate:** Whisper is the only billable line item here. Default behaviour: free up to N minutes/day per IP, then BYO-key prompt. Tracked via the same LRU cache + IP-hash bucket as we'd do for any usage gate.
+
+---
+
+## 17. Competitive landscape (snapshot, May 2026)
+
+A short scan of where we stand vs. the obvious incumbents — kept brief because the landscape rots quickly and the spec is read at fail time, not as a marketing deck.
+
+| Tool | Strength | What we have that they don't | What they have that we don't |
+|---|---|---|---|
+| **Google Translate** | 100+ langs, camera, document, mature web/app/API. | Multi-source compare, idiom-aware LLM panel, 4 view modes, history sidebar, free-by-default, zero account, open source. | Camera-text OCR, 100-lang coverage, brand trust. |
+| **DeepL** | Best-in-class quality (esp. DE/FR/EN/RU). Document. | Multi-source view that includes DeepL alongside others — they're a *panel* for us, not a competitor. | Highest single-engine quality, formal/informal tone, glossaries. |
+| **Apple Translate** | On-device, conversation mode, iOS integration. | Browser-first, no app install needed, cross-platform, more languages, multi-source compare, pairs/stream views. | True on-device for some langs (privacy); iOS Shortcuts. |
+| **Microsoft Translator** | Conversation rooms (multi-user), Office integration. | Cleaner UX, no account, much smaller bundle, BYO-key option for power users. | Multi-user conversation rooms, Office plug-in. |
+| **iTranslate / TranSync / Notta** | Voice-first; transcription. | Free-tier without sign-up, multi-source compare, view variety, paragraph-pair UX. | Pro features locked behind subscription. |
+| **Otter.ai / Rev** | Speaker-diarised transcription, meeting recording. | Translation alongside transcription; no account. | Speaker diarisation, meeting calendar integration. |
+| **OpenAI Whisper (API)** | Best-in-class transcription quality. | Wrap them as a provider in our `/api/transcribe` (§16). | They're an engine, not an app. |
+
+### Our actual moat (today)
+
+1. **Multi-source side-by-side comparison** — nobody else lets you see DeepL, Lingva, MyMemory, LLM, local dictionary on one screen for the same input. This is the differentiator.
+2. **Four view modes** (Split, Pairs scrolling-teleprompter, Stream, Compare) — purpose-built for distinct reading rhythms (lookup vs. lecture vs. simultaneous).
+3. **Zero-account, zero-cost default** — Free providers wired with no key, server cache, no usage tracking. A user-hostile move by everyone else.
+4. **Voice-pair detection** — say a language pair, both chips update. Tiny but uniquely friction-free.
+5. **Pairs view as a teleprompter** — reading a lecture transcript live in two languages, in a single column, is something only we do.
+
+### Our actual gaps
+
+1. No image / camera OCR (Google's strongest mobile feature).
+2. No native mobile app yet (Tauri mobile is scaffolded, not shipped).
+3. No multi-user / shared conversation (Microsoft's edge — though arguably out of scope).
+4. No offline mode beyond the local seed dictionary (Apple's edge for travellers).
+
+---
+
+## 18. Monetization — when "must" vs "want" (planned, no rush)
+
+Right now we cost **near-zero** to run: Vercel free tier, free providers, server LRU cache. No reason to charge.
+
+Things that would force a paid tier (in priority of likelihood):
+
+1. **Vercel quota** (most likely first trigger). Free tier: 100 GB-hours/month compute, 100 GB bandwidth. We'll hit this around ~50–200 active daily users depending on traffic shape. Mitigation: aggressive edge caching, then Hobby → Pro ($20/mo) buys us 6× headroom. Probably enough until ~5k DAU.
+2. **LLM costs** (Anthropic / Gemini / Groq). Currently the user adds their own key — zero cost to us. If we ever offer a built-in "Pro translation" tier with our key, that's where charging starts. Estimate: $0.001–$0.01 per translation depending on model. A free Pro trial of 100 translations/month would cost ~$0.10–1 per active user.
+3. **Whisper transcription** (§16). Each minute of audio = $0.006. A free quota of 30 min/day per user = $0.18/user/day max. Either gate via BYO-key (preferred) or sell a "Transcription Pro" tier at e.g. $5/mo for 500 min.
+4. **History sync across devices** — needs accounts + Supabase. Optional add-on, ~$3/mo seems right.
+
+### Recommended ladder
+
+| Tier | Price | What's in | What's not |
+|---|---|---|---|
+| **Free** (today) | $0 | All current features incl. multi-source compare, voice, history (local-only), all 4 views, transcription with BYO Whisper key. | LLM translation requires user's own key. Cross-device sync. |
+| **Pro** (future) | $5–8/mo | LLM idiom translation included, 500 min/mo transcription included, cross-device sync, no rate limits. | Speaker diarisation, custom glossaries (Plus tier). |
+| **Plus** (later) | $15/mo | Above + speaker diarisation, glossaries, priority queue, custom subdomain. | — |
+
+**When to start charging:** only when (a) Vercel bills us; or (b) we have ≥100 paying-intent users asking for LLM-included; or (c) we ship Whisper transcription and a Pro tier becomes natural. Not before — premature monetization kills growth on a tool like this.
+
+---
+
+## 19. Open Questions (defaults chosen, easy to change)
 
 1. **Mode**: Live or Compare on first open? — **Live**. Better demo, more delightful on phone.
 2. **Free mode default**: ON. Friend's deploy never bills him by accident.
 3. **Default 4 panels (Compare)**: Local · MyMemory · Lingva · LLM (LLM panel will say "add a key" until one is set, which is fine).
 4. **Desktop shell loads remote URL or static export?** — **Remote URL** for v0.7. Revisit if we ever decouple the backend.
+5. **Picker layout**: Combined two-column src/tgt picker (v0.11.2) — replaced the single-column per-chip dropdown. Same click count for changing one side, one fewer click for changing both.
