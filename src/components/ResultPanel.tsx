@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ALL_PROVIDER_INFOS } from "@/lib/providers";
 import type { ProviderId, TranslateResult } from "@/lib/types";
+import { useClickAway } from "@/lib/useClickAway";
 
 type Props = {
   providerId: ProviderId;
@@ -115,6 +116,8 @@ export default function ResultPanel({
   const info = ALL_PROVIDER_INFOS.find((p) => p.id === providerId)!;
   const [pickerOpen, setPickerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  useClickAway(pickerRef, pickerOpen, () => setPickerOpen(false));
 
   function copy(text: string) {
     navigator.clipboard?.writeText(text).then(() => {
@@ -130,22 +133,26 @@ export default function ResultPanel({
         <span className="rounded border border-zinc-300 bg-zinc-50 px-1 font-mono text-[10px] uppercase tracking-wider text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
           {PROVIDER_CODE[info.id] ?? info.id.slice(0, 3).toUpperCase()}
         </span>
-        <button
-          type="button"
-          onClick={() => setPickerOpen((v) => !v)}
-          className="flex items-center gap-1 text-sm font-medium hover:opacity-80"
-        >
-          {info.name}
-          <svg width="9" height="6" viewBox="0 0 10 6" className="opacity-50">
-            <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          </svg>
-        </button>
-        <span className="ml-auto text-[11px] tabular-nums text-zinc-400">
-          {result?.latencyMs != null ? `${result.latencyMs} ms` : ""}
-          {result?.fallback ? " · fallback" : ""}
-        </span>
-        {pickerOpen && (
-          <div className="absolute left-3 top-11 z-10 w-56 overflow-hidden rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-lg">
+        <div ref={pickerRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={pickerOpen}
+            className="flex items-center gap-1 text-sm font-medium hover:opacity-80"
+          >
+            {info.name}
+            <svg
+              width="9"
+              height="6"
+              viewBox="0 0 10 6"
+              className={`opacity-50 transition-transform ${pickerOpen ? "rotate-180" : ""}`}
+            >
+              <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            </svg>
+          </button>
+          {pickerOpen && (
+            <div role="listbox" className="absolute left-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5">
             {ALL_PROVIDER_INFOS.map((p) => (
               <button
                 key={p.id}
@@ -167,8 +174,13 @@ export default function ResultPanel({
                 </span>
               </button>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
+        <span className="ml-auto text-[11px] tabular-nums text-zinc-400">
+          {result?.latencyMs != null ? `${result.latencyMs} ms` : ""}
+          {result?.fallback ? " · fallback" : ""}
+        </span>
       </div>
 
       {/* Body */}
