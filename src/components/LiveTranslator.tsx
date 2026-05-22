@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import LanguageBar from "@/components/LanguageBar";
 import DevBadge from "@/components/DevBadge";
 import VoiceControl from "@/components/VoiceControl";
+import { readDroppedText } from "@/lib/drop";
 import { saveSession, updateSession, type Session } from "@/lib/history";
 import {
   useAutoGrowTextarea,
@@ -107,6 +108,27 @@ export default function LiveTranslator({
   // Pairs view — committed paragraph pairs (read-only history above the active pair).
   // Lifted here so the swap button can flip every pair, not just the active one.
   const [pairsCommitted, setPairsCommitted] = useState<Pair[]>([]);
+
+  // ── File drop ─────────────────────────────────────────────────────────────
+  // Text-like files dropped anywhere on the live view land in the source.
+  // Audio + image support queued (DESIGN §16) — needs Whisper / Tesseract.
+  const [dropHover, setDropHover] = useState(false);
+  const dropHandlers = {
+    onDragOver: (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes("Files")) {
+        e.preventDefault();
+        setDropHover(true);
+      }
+    },
+    onDragLeave: () => setDropHover(false),
+    onDrop: async (e: React.DragEvent) => {
+      e.preventDefault();
+      setDropHover(false);
+      const dropped = await readDroppedText(e.dataTransfer.files);
+      if (!dropped) return;
+      setText(text ? text + "\n\n" + dropped : dropped);
+    },
+  };
 
   // ── Smart swap ───────────────────────────────────────────────────────────
   // Reverse button on the LanguageBar now also reverses the *text*: the current
@@ -481,7 +503,19 @@ export default function LiveTranslator({
     );
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="relative flex flex-1 flex-col gap-4" {...dropHandlers}>
+      {/* Drop overlay — appears while a file is being dragged over the view. */}
+      {dropHover && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-2xl border-2 border-dashed border-zinc-400 bg-white/80 dark:border-zinc-500 dark:bg-zinc-900/80"
+        >
+          <div className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 shadow-lg dark:bg-zinc-100 dark:text-zinc-900">
+            Drop text · .txt · .md · .srt · .vtt
+            <span className="ml-2 text-[10px] font-mono uppercase tracking-wider opacity-70">audio · soon</span>
+          </div>
+        </div>
+      )}
       {/* ── Toolbar row: language bar + view switcher + voice control ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="relative">
