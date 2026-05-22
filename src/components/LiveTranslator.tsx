@@ -510,10 +510,50 @@ export default function LiveTranslator({
 
       {/* ── View-specific layout ───────────────────────────────────────────── */}
       {view === "split" && (
-        <>
-          {/* Source pane — capped at ~35dvh so it never pushes the target
-              pane below the fold. Internal scroll once content exceeds. */}
-          <div className="relative max-h-[35dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 pb-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          {/* Chat-paradigm: TARGET on top fills available vertical space;
+              SOURCE at bottom grows upward as the user types (textarea
+              auto-grow capped at 50dvh); MIC CLUSTER pinned at the bottom
+              in the thumb zone. No empty real estate — when source is
+              short the target gets nearly all the height, and vice versa.
+              When both grow to meet in the middle they scroll internally. */}
+
+          {/* Translation pane — flex-1 fills remaining space. */}
+          <div className="relative flex-1 min-h-[8rem] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+            <FlagLabel lang={tgt} loading={translating} />
+            {pairsCommitted.length > 0 && (
+              <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
+                {pairsCommitted.map((p) => (
+                  <p
+                    key={p.id}
+                    className="text-[17px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300"
+                  >
+                    {p.tgt || <span className="text-zinc-400">…</span>}
+                  </p>
+                ))}
+              </div>
+            )}
+            <div className={pairsCommitted.length > 0 ? "mt-3" : "mt-2"}>{targetField}</div>
+            {translation?.idiomatic?.note && (
+              <p className="mt-3 text-xs italic text-zinc-500">{translation.idiomatic.note}</p>
+            )}
+            {translation?.notes && translation.fallback && (
+              <p className="mt-3 text-[11px] text-zinc-400">{translation.notes}</p>
+            )}
+            {tgtText && (
+              <p className="mt-2 text-[11px] text-zinc-400">{wordCount(tgtText)} words</p>
+            )}
+            <FieldActions
+              text={[...pairsCommitted.map((p) => p.tgt), tgtText].filter(Boolean).join("\n\n")}
+              lang={tgt}
+              ttsSupported={ttsSupported}
+            />
+            <DevBadge n={5} label="tgt" />
+          </div>
+
+          {/* Source pane — content-sized, anchored at the bottom. Grows
+              upward as the user types; caps at 50dvh and scrolls. */}
+          <div className="relative shrink-0 max-h-[50dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 pb-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <FlagLabel lang={src} />
             {pairsCommitted.length > 0 && (
               <div className="mt-2 space-y-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
@@ -546,41 +586,9 @@ export default function LiveTranslator({
             <DevBadge n={1} label="src" />
           </div>
 
+          {/* Mic cluster — thumb-zone, very bottom of the live view. */}
           {controlCluster}
-
-          {/* Translation pane — capped same as source. */}
-          <div className="relative max-h-[35dvh] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
-            <FlagLabel lang={tgt} loading={translating} />
-            {pairsCommitted.length > 0 && (
-              <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
-                {pairsCommitted.map((p) => (
-                  <p
-                    key={p.id}
-                    className="text-[17px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300"
-                  >
-                    {p.tgt || <span className="text-zinc-400">…</span>}
-                  </p>
-                ))}
-              </div>
-            )}
-            <div className={pairsCommitted.length > 0 ? "mt-3" : "mt-2"}>{targetField}</div>
-            {translation?.idiomatic?.note && (
-              <p className="mt-3 text-xs italic text-zinc-500">{translation.idiomatic.note}</p>
-            )}
-            {translation?.notes && translation.fallback && (
-              <p className="mt-3 text-[11px] text-zinc-400">{translation.notes}</p>
-            )}
-            {tgtText && (
-              <p className="mt-2 text-[11px] text-zinc-400">{wordCount(tgtText)} words</p>
-            )}
-            <FieldActions
-              text={[...pairsCommitted.map((p) => p.tgt), tgtText].filter(Boolean).join("\n\n")}
-              lang={tgt}
-              ttsSupported={ttsSupported}
-            />
-            <DevBadge n={5} label="tgt" />
-          </div>
-        </>
+        </div>
       )}
 
       {view === "paragraph" && (
@@ -872,8 +880,6 @@ function ParagraphLayout({
 
   return (
     <>
-      <div className="relative flex items-center justify-center">{controls}</div>
-
       {/* Single continuous container: committed pairs above, active pair (editable) at the bottom. */}
       <div
         ref={scrollRef}

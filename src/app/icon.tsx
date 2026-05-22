@@ -3,11 +3,8 @@ import { ImageResponse } from "next/og";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-/**
- * 32×32 favicon — abstract Culture-glyph rendered at small size.
- * Stroke widths and dot radii are oversized so the mark stays readable
- * when the OS scales it down further (browser tab, taskbar, etc).
- */
+/** 32×32 favicon — Culture-glyph with chunky strokes (+50% from v0.11) so
+ *  the mark stays readable when downscaled to 16×16 in a browser tab. */
 export default function Icon() {
   return new ImageResponse(
     (
@@ -24,9 +21,9 @@ export default function Icon() {
         }}
       >
         <svg width="22" height="22" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="4.2" fill="none" strokeLinecap="round" />
-          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="4.2" fill="none" strokeLinecap="round" />
-          <circle cx="32" cy="32" r="4.2" fill="#fafafa" />
+          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="6.3" fill="none" strokeLinecap="round" />
+          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="6.3" fill="none" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="6.3" fill="#fafafa" />
         </svg>
       </div>
     ),

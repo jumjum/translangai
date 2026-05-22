@@ -12,12 +12,12 @@
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#chip)"/>
   <rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="#a1a1aa" stroke-width="0.5" opacity="0.55"/>
-  <!-- Lines / dots bumped ~30% larger for readability at small sizes. -->
-  <path d="M 26 18 Q 18 32 26 46" stroke="url(#mark)" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-  <path d="M 38 18 Q 46 32 38 46" stroke="url(#mark)" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-  <circle cx="32" cy="32" r="3.2" fill="url(#mark)"/>
-  <line x1="8" y1="32" x2="18" y2="32" stroke="url(#mark)" stroke-width="1.9" stroke-linecap="round" opacity="0.8"/>
-  <line x1="46" y1="32" x2="56" y2="32" stroke="url(#mark)" stroke-width="1.9" stroke-linecap="round" opacity="0.8"/>
-  <circle cx="8" cy="32" r="1.9" fill="url(#mark)"/>
-  <circle cx="56" cy="32" r="1.9" fill="url(#mark)"/>
+  <!-- Strokes / dots bumped another +50% (v0.11.3) — fully readable at 16px. -->
+  <path d="M 26 18 Q 18 32 26 46" stroke="url(#mark)" stroke-width="4.8" fill="none" stroke-linecap="round"/>
+  <path d="M 38 18 Q 46 32 38 46" stroke="url(#mark)" stroke-width="4.8" fill="none" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="4.8" fill="url(#mark)"/>
+  <line x1="8" y1="32" x2="17" y2="32" stroke="url(#mark)" stroke-width="2.8" stroke-linecap="round" opacity="0.85"/>
+  <line x1="47" y1="32" x2="56" y2="32" stroke="url(#mark)" stroke-width="2.8" stroke-linecap="round" opacity="0.85"/>
+  <circle cx="8" cy="32" r="2.8" fill="url(#mark)"/>
+  <circle cx="56" cy="32" r="2.8" fill="url(#mark)"/>
 </svg>
