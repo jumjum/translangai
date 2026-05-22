@@ -209,12 +209,12 @@ function CombinedPicker({
             <li key={`src-${l}`}>
               <button
                 type="button"
-                disabled={l === tgt}
                 onClick={() => {
                   onChangeSrc(l);
                   bumpPair(l, tgt);
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 ${
+                title={l === tgt ? "Same as target — switches to transcription mode" : undefined}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
                   l === src
                     ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-100"
                     : ""
@@ -257,12 +257,12 @@ function CombinedPicker({
             <li key={`tgt-${l}`}>
               <button
                 type="button"
-                disabled={l === src}
                 onClick={() => {
                   onChangeTgt(l);
                   bumpPair(src, l);
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 ${
+                title={l === src ? "Same as source — switches to transcription mode" : undefined}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
                   l === tgt
                     ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-100"
                     : ""

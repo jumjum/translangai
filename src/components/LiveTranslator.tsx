@@ -509,7 +509,26 @@ export default function LiveTranslator({
       </div>
 
       {/* ── View-specific layout ───────────────────────────────────────────── */}
-      {view === "split" && (
+      {/* Transcription mode: same source and target lang = single-pane
+          dictation/file-transcribe UI, no translation. */}
+      {src === tgt && (
+        <TranscribeLayout
+          src={src}
+          text={text}
+          setText={setText}
+          interim={speech.listening ? speech.interim : ""}
+          isListening={speech.listening}
+          ttsSupported={ttsSupported}
+          summary={summary}
+          summarizing={summarizing}
+          requestSummary={requestSummary}
+          taRef={taRef}
+          clearAll={clearAll}
+          controls={controlCluster}
+        />
+      )}
+
+      {src !== tgt && view === "split" && (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           {/* Chat-paradigm: TARGET on top fills available vertical space;
               SOURCE at bottom grows upward as the user types (textarea
@@ -591,7 +610,7 @@ export default function LiveTranslator({
         </div>
       )}
 
-      {view === "paragraph" && (
+      {src !== tgt && view === "paragraph" && (
         <ParagraphLayout
           src={src}
           tgt={tgt}
@@ -607,7 +626,7 @@ export default function LiveTranslator({
         />
       )}
 
-      {view === "stream" && (
+      {src !== tgt && view === "stream" && (
         <StreamLayout
           src={src}
           tgt={tgt}
@@ -1124,6 +1143,130 @@ function StreamLayout({
  * text field so the field's content can be exported with one tap. Distinct
  * from the toolbar speaker which controls *continuous* auto-speak.
  */
+// ──────────────────────────────────────────────────────────────────────────
+// Transcription layout — triggered when source language === target language.
+// Single pane, no translation. Pure dictation / file-transcribe UI with a
+// manual Summarise button. DESIGN §15.
+// ──────────────────────────────────────────────────────────────────────────
+function TranscribeLayout({
+  src,
+  text,
+  setText,
+  interim,
+  isListening,
+  ttsSupported,
+  summary,
+  summarizing,
+  requestSummary,
+  taRef,
+  clearAll,
+  controls,
+}: {
+  src: Lang;
+  text: string;
+  setText: (s: string) => void;
+  interim: string;
+  isListening: boolean;
+  ttsSupported: boolean;
+  summary: { text: string; provider: string; note?: string } | null;
+  summarizing: boolean;
+  requestSummary: (text: string) => void;
+  taRef: (el: HTMLTextAreaElement | null) => void;
+  clearAll: () => void;
+  controls: React.ReactNode;
+}) {
+  const live = isListening ? text + (interim ? (text ? " " : "") + interim : "") : text;
+  const canSummarise = live.trim().length > 0 && !summarizing;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {/* Transcript pane fills the screen — same chat-paradigm: one big
+          read/write region above the mic cluster. */}
+      <div className="relative flex-1 min-h-[12rem] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 pb-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex items-center justify-between">
+          <FlagLabel lang={src} />
+          <span className="system-label text-zinc-500 dark:text-zinc-400">▸ TRANSCRIBE</span>
+        </div>
+        <div className="mt-2 min-h-[4.5rem]">
+          {isListening ? (
+            <p className="text-xl leading-relaxed font-medium whitespace-pre-wrap">
+              {text}
+              {interim && <span className="text-zinc-400"> {interim}</span>}
+              {!text && !interim && <span className="text-zinc-400">Listening…</span>}
+            </p>
+          ) : (
+            <textarea
+              ref={taRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Tap the mic to dictate, or paste/drop text here…"
+              rows={3}
+              lang={LANG_META[src].bcp47}
+              spellCheck
+              className="block w-full resize-none bg-transparent text-xl leading-relaxed font-medium outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+            />
+          )}
+        </div>
+        {text && (
+          <button
+            type="button"
+            onClick={clearAll}
+            aria-label="Clear"
+            className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
+          >
+            ✕
+          </button>
+        )}
+        <FieldActions text={live} lang={src} ttsSupported={ttsSupported} />
+        <DevBadge n={1} label="transcript" />
+      </div>
+
+      {/* Summary card — appears under the transcript when present. */}
+      {(summary || summarizing) && (
+        <div className="relative rounded-2xl border border-zinc-300 bg-zinc-50 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/60">
+          <div className="flex items-center justify-between">
+            <h3 className="system-label text-zinc-700 dark:text-zinc-200">▸ Summary</h3>
+            {summary && (
+              <span className="system-label text-zinc-500 dark:text-zinc-400">
+                src · {summary.provider === "llm" ? "CLAUDE" : "HEURISTIC"}
+              </span>
+            )}
+          </div>
+          {summarizing ? (
+            <div className="mt-3 space-y-2">
+              <div className="h-4 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
+            </div>
+          ) : (
+            summary && (
+              <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
+                {summary.text}
+              </p>
+            )
+          )}
+        </div>
+      )}
+
+      {/* Mic cluster + Summarise side-button. */}
+      <div className="relative flex items-center justify-center gap-3">
+        {controls}
+        <button
+          type="button"
+          onClick={() => canSummarise && requestSummary(live)}
+          disabled={!canSummarise}
+          aria-label="Summarise transcript"
+          title="Summarise the transcript so far"
+          className={`relative inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${BTN_CHIP}`}
+        >
+          <span className="font-mono uppercase tracking-[0.14em]">Σ</span>
+          <span className="hidden sm:inline">summarise</span>
+          <DevBadge n="S" label="summary" position="tr" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FieldActions({
   text,
   lang,
