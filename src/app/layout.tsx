@@ -27,8 +27,11 @@ export const viewport: Viewport = {
   maximumScale: 5,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+    // Splash & status-bar tint — matches the logo's mid-grey chip gradient
+    // so the PWA splash on Android shows a continuous frame around the
+    // logo instead of a black backdrop.
+    { media: "(prefers-color-scheme: light)", color: "#3f3f46" },
+    { media: "(prefers-color-scheme: dark)", color: "#3f3f46" },
   ],
 };
 

@@ -1,4 +1,4 @@
-# TransLang AI — Design Specification (v0.11.2)
+# TransLang AI — Design Specification (v0.11.8)
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 
@@ -543,3 +543,132 @@ Things that would force a paid tier (in priority of likelihood):
 3. **Default 4 panels (Compare)**: Local · MyMemory · Lingva · LLM (LLM panel will say "add a key" until one is set, which is fine).
 4. **Desktop shell loads remote URL or static export?** — **Remote URL** for v0.7. Revisit if we ever decouple the backend.
 5. **Picker layout**: Combined two-column src/tgt picker (v0.11.2) — replaced the single-column per-chip dropdown. Same click count for changing one side, one fewer click for changing both.
+
+---
+
+## 22. Speech-recognition quality (Swedish & co.)
+
+**The gap.** Web Speech API quality is fixed per browser+OS. Chrome on Android uses Google's recogniser which is excellent for English, decent for major European languages, and noticeably weaker for less-common ones (Swedish, Polish, Danish at the user-observed end). Punctuation is rarely emitted by any browser. We cannot pick a different engine inside the browser.
+
+**Three remedies, in order of cost-effectiveness:**
+
+1. **LLM punctuation polish (recommended, v0.12).** After each commit (or on-demand from a button), send the active paragraph's raw transcript to a small model (Claude Haiku, Gemini Flash, GPT-4o-mini) with a 3-line prompt: *"Add punctuation and capitalisation to this {{lang}} transcript. Fix obvious mishears using context. Return only the corrected text."* Cost: ~$0.0005 per ~50-word paragraph at Haiku rates. Free providers don't do this — it's a Pro-tier feature, and gated behind "Free mode" being off. Local seed dictionary can do a very crude version of capitalisation-after-period for $0.
+   - **Implementation sketch**: new `/api/polish?lang=sv` endpoint, POST `{ text }`, returns `{ polished, provider, ms }`. Wire into the commit pipeline in Pairs view. Cache results in the same LRU as translations.
+2. **Cloud Whisper for dictation (v0.13 with §16 audio files).** Same `/api/transcribe` endpoint that handles dropped audio files can also accept a short browser-recorded audio blob. Whisper-large punctuates and capitalises far better than browser ASR — and handles Swedish well. Cost: ~$0.006/min. Toggle in settings: "Better transcription (paid)".
+3. **Self-hosted Whisper (later, on-prem only).** For the medical/firewall verticals (§24) we'll need this anyway. `whisper.cpp` runs at near-real-time on consumer hardware.
+
+**v0.11.x stopgap:** keep displaying raw transcript honestly. Add a small "✨ polish" button to the Pairs / Transcribe summary cluster that calls the v0.12 endpoint when implemented.
+
+---
+
+## 23. Multi-user "linked phones" — paired conversation mode
+
+**The problem.** Today: two non-shared-language people use Google Translate by passing one phone back and forth, switching the language direction each time. Or "two-mic" conversation modes (Apple / Google) where one phone tries to listen to two speakers — the mic is only oriented to one person, so the other gets terrible recognition.
+
+**The proposal.** Each person uses **their own phone**. The two phones pair (QR or short code) into a single conversation session. Each phone runs locally-optimal recognition for its owner's voice. Transcripts (text, not audio) sync between devices in real time. Both phones show both sides of the conversation; either can speak the latest translation aloud through their own headphones / earpiece.
+
+**Why it's better than every existing solution:**
+- Each mic is oriented to its dedicated speaker → recognition quality is as good as solo dictation.
+- Eye contact preserved — no passing, no holding the phone between you.
+- Both speakers see the full transcript on their own screens.
+- Audio out can be earphone-only, so neither phone needs to play out loud (great in cafés, plane seats).
+- No special hardware (Pocketalk etc.).
+
+**Technical design.**
+
+- **Transport**: WebRTC DataChannel for peer-to-peer text sync. Free STUN servers (Google's, Cloudflare's). TURN only needed for very-restrictive NATs — add an optional self-hosted TURN later. No audio crosses the network; each device's recogniser stays local.
+- **Pairing**: phone A shows a QR with a short-lived session token + WebRTC offer. Phone B scans → handshake. Alternative: 6-digit short code via a tiny signalling relay on Vercel (~10 lines).
+- **Privacy**: audio never leaves either device. Only the agreed-upon transcript + translation text. No accounts, no server log.
+- **UI**: a new "Pair" view alongside Split/Pairs/Stream/Transcribe. Same chat-paradigm layout, but each speaker's bubble is tagged with `me` / `them`. Tapping a bubble plays it aloud in your headphones.
+- **Setup time estimate**: ~1–2 weeks of focused work (~200 lines WebRTC setup, ~150 lines pairing UI, ~150 lines state sync, ~200 lines new view). Doesn't touch the existing translation pipeline.
+
+**Risks / open questions.**
+- WebRTC + iOS Safari: works as of iOS 14.5 but the API surface is quirky. Test early.
+- Battery: continuous mic + WebRTC will eat ~10–15% battery per hour. Acceptable for a translator app used in 5–30 min bursts.
+- Discoverability: most users won't realise this exists. Add a "Conversation mode" entry point in the header beside Live / Compare.
+
+**Validation:** none of Google / Apple / Microsoft / Otter / Pocketalk do this exact pattern. Plausible candidate for our most-distinctive feature. Worth a prototype next quarter.
+
+---
+
+## 24. Modular TransLangAI — verticals and on-prem
+
+**The path.** Make the codebase a **pnpm workspace monorepo** so each vertical is an `apps/<name>` that composes the same shared `packages/core` (providers, types, LRU cache, history, segmenter, i18n) plus `packages/ui` (LiveTranslator, CompareView, HistoryPanel, ChatComposer, etc.). Per-vertical apps customise: branding, available providers, feature flags, optional templates / glossaries / forms, optional behind-firewall deployment.
+
+| Vertical | What's different vs. consumer | Stack additions |
+|---|---|---|
+| **Medical** (clinics, hospitals) | HIPAA-ready audit log, no third-party LLMs by default, PII redaction before any cloud call, SOAP / OPQRST templates, ICD-10 glossary, encrypted local history (Hive + libsodium). On-prem option mandatory. | Self-hosted Whisper, self-hosted Llama-3-Med / Meditron, Keycloak SSO, Postgres + pgcrypto, audit log to OpenSearch, optional MinIO for audio storage. |
+| **Police / law enforcement** | Chain-of-custody log, evidence-grade timestamps, multi-speaker diarisation, immutable transcript signing, glossary of legal/criminal terms. | Whisper-large with diarisation (pyannote), hash-chain log, hardware-backed signing (Yubikey) for on-prem builds. |
+| **Insurance / claims** | Form-fill templates (claim taxonomy), photo-attachment OCR, summary into structured JSON, integration hooks (Zapier / webhook). | Tesseract OCR (§25), JSON-schema output mode for LLMs, webhook signing. |
+| **Consumer** (current) | Free providers default, public LLMs opt-in, history local-only. | Current stack — no change. |
+
+**Deployment shapes:**
+- **SaaS** for consumer + small-team verticals → current Vercel deploy + Supabase auth + optional Supabase storage. Annual or monthly per-seat.
+- **On-prem** for hospitals / police / classified deployments → Docker Compose / Helm chart bundle: Next.js app + Postgres + Whisper service + Llama service + Keycloak. No outbound network required. Annual licence + support contract.
+
+**Refactor cost to get to monorepo:**
+- pnpm workspace setup + `packages/core` extraction: ~1 week.
+- `packages/ui` extraction: ~1 week.
+- First vertical app shell (medical) as a thin wrapper: ~3–4 days.
+- Self-hosted Whisper + Llama Docker images: ~1 week.
+- Audit log + PII redaction modules: ~1 week.
+- **Total to first medical pilot**: ~5–6 weeks.
+
+**Smartest first step:** keep the current single-repo single-app structure for another 2–3 months while consumer iteration continues, **but**:
+- Move all business logic out of `src/components/*` into `src/lib/*` already (mostly done — providers, segmenter, history, i18n, langPairStats are all in `lib/`).
+- Keep component files free of external-API specifics (already true).
+- When the first vertical interest is real (paying pilot or LOI), spend the 5–6 weeks. Don't pre-build it.
+
+---
+
+## 25. Camera OCR (drop image → text)
+
+Open-source pipeline, no external API needed for the default tier.
+
+| Layer | Choice | Why |
+|---|---|---|
+| OCR engine | **Tesseract.js** (`tesseract.js@5`) | Pure JS/WASM, runs in the browser, no upload. ~10 MB worker downloaded on first use, cached thereafter. Supports 100+ languages. Slow but acceptable for one-off image translations. |
+| Image capture | `<input type="file" capture="environment">` → camera prompt on mobile, file dialog on desktop. | Standard browser, no permissions plumbing. |
+| Preprocessing | Canvas: greyscale + adaptive threshold + deskew. ~50 lines. | Tesseract's accuracy doubles on cleaned inputs. |
+| Wiring | Same drop zone (§16) accepts `image/*` and routes to Tesseract instead of FileReader. | Reuses every existing flow. |
+| LLM-OCR fallback (paid) | Claude / Gemini vision endpoints for hard images (photos of street signs, restaurant menus, etc.). | Better than Tesseract for low-quality photos. Optional, behind "Free mode off". |
+
+**Implementation outline**:
+1. Add `tesseract.js` as a dep. Dynamic import only when first image is dropped — keeps initial bundle small.
+2. `src/lib/ocr.ts`: `recognise(file: File, lang: Lang): Promise<string>`. Wraps Tesseract worker with lang code mapping.
+3. Wire into the existing `useFileDrop` handler in LiveTranslator — branch on `file.type.startsWith("image/")`.
+4. Show a small "OCR…" progress chip while running.
+5. Result lands in the source field, then translation runs as normal.
+
+This closes the single biggest competitive gap vs. Google Translate (camera mode).
+
+---
+
+## 26. Native mobile — Android first, macOS in parallel
+
+**Path of least resistance.** We already have:
+- A PWA that installs to home screen (works today on Android Chrome + iOS Safari).
+- A Tauri 2 desktop scaffold in `src-tauri/` that loads the remote URL (works today; needs Rust toolchain to compile).
+
+**Step ladder, each step buys some piece of "more native":**
+
+| Step | Effort | Native gain | Cost |
+|---|---|---|---|
+| 1. **Polish the PWA**: maskable icon (done), splash screen colours (done v0.11.8), service-worker shell cache (done v0.7). | done | A2HS already works. | 0 |
+| 2. **Android TWA** (Trusted Web Activity) via Bubblewrap. Wraps the PWA into a Play-Store-distributable APK / AAB. Same code, native shell with no browser chrome. | ~1 day | Play Store listing, slightly nicer launch, can request Notification permission. | $25 Play Store one-time fee |
+| 3. **Build the existing Tauri 2 desktop shell**. Install Rust, `cargo tauri build`. Get a real `.app` on macOS and a `.msi` on Windows. | ~half-day | Native window, global hotkey ⌘⇧D, dock icon, macOS Services menu wiring later. | 0 |
+| 4. **Tauri 2 mobile (Android first)**. The same Rust shell now targets Android (`cargo tauri android init` + `cargo tauri android build`). Same web app, native APK. Slightly heavier than TWA but gives us native module access (NFC, deep links, native auth). | ~3–5 days | Native modules; no Chrome runtime dependency. | $25 Play (already paid) |
+| 5. **Tauri 2 iOS**. Same toolchain. Requires Apple Developer ($99/yr) + macOS for Xcode. | ~3–5 days | App Store presence; native iOS features (Shortcuts integration). | $99/yr |
+| 6. **React Native** *only if* we ever genuinely need true-native widgets and Tauri-mobile's webview perf falls short. Today: not needed. | 4–6 weeks | Pixel-perfect native UI. | — |
+
+**Decision: do steps 2 + 3 next. Defer 4–6.** TWA gets us on Play Store this week. Desktop Tauri compile is a one-evening task that gives us a real `.app` to demo. Tauri mobile / RN can wait until we have user signal that the PWA is genuinely insufficient.
+
+**Why not Flutter (re-stated):** see §12. The voice-API parity gap, the bundle-size hit on web, and the language rewrite cost remain the same.
+
+---
+
+## 27. Updated open questions
+
+6. **LLM punctuation polish**: paid-only or include in free tier? — **Paid-only** (Pro). Default off. Otherwise our free-tier API cost is unbounded.
+7. **Pair / Conversation mode**: WebRTC P2P or relay through our server? — **P2P** (no audio crosses the network, no privacy concerns). Add an optional relay for restrictive NATs later.
+8. **Vertical timeline**: build now or wait for paying interest? — **Wait**. Keep code modular-ready (already mostly is) but don't fork the repo until there's a customer.

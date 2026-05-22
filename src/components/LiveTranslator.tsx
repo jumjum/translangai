@@ -20,6 +20,7 @@ import {
   stopSpeaking,
   useSpeechRecognition,
 } from "@/lib/speech";
+import { t } from "@/lib/i18n";
 import { LANG_META, type Lang, type TranslateResult } from "@/lib/types";
 import { BTN_CHIP, BTN_CHIP_ACTIVE, BTN_HERO } from "@/lib/ui";
 
@@ -109,6 +110,12 @@ export default function LiveTranslator({
   // Pairs view — committed paragraph pairs (read-only history above the active pair).
   // Lifted here so the swap button can flip every pair, not just the active one.
   const [pairsCommitted, setPairsCommitted] = useState<Pair[]>([]);
+
+  // Sticky-bottom on the Split-view target pane so the latest translation
+  // is always in view as new content arrives.
+  const splitTgtRef = useStickyBottom<HTMLDivElement>(
+    (translation?.primary ?? "").length + pairsCommitted.length,
+  );
 
   // ── File drop ─────────────────────────────────────────────────────────────
   // Text-like files dropped anywhere on the live view land in the source.
@@ -473,7 +480,7 @@ export default function LiveTranslator({
           {speech.finalText}
           {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
           {!speech.finalText && !speech.interim && (
-            <span className="text-zinc-400">Listening…</span>
+            <span className="text-zinc-400">{t("liveTranscriptListening", src)}</span>
           )}
         </p>
       ) : (
@@ -481,7 +488,7 @@ export default function LiveTranslator({
           ref={taRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Tap the mic or type here…"
+          placeholder={t("sourcePlaceholderIdle", src)}
           rows={2}
           lang={LANG_META[src].bcp47}
           spellCheck
@@ -500,7 +507,7 @@ export default function LiveTranslator({
         <div className="h-5 w-1/2 animate-pulse rounded bg-zinc-200/70 dark:bg-zinc-800/70" />
       </div>
     ) : (
-      <p className="text-xl leading-snug text-zinc-400">Translation will appear here…</p>
+      <p className="text-xl leading-snug text-zinc-400">{t("targetPlaceholder", tgt)}</p>
     );
 
   return (
@@ -555,8 +562,11 @@ export default function LiveTranslator({
       {src !== tgt && view === "split" && (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           {/* Translation pane — flex-1 fills available vertical space.
-              Reads like an incoming chat message. */}
-          <div className="relative flex-1 min-h-[10rem] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+              Sticky-bottom auto-scroll keeps the latest translation in view. */}
+          <div
+            ref={splitTgtRef}
+            className="relative flex-1 min-h-[10rem] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40"
+          >
             <FlagLabel lang={tgt} loading={translating} />
             {pairsCommitted.length > 0 && (
               <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
@@ -945,7 +955,7 @@ function ParagraphLayout({
                   <p className="text-[17px] leading-relaxed font-medium whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
                     {text}
                     {interim && <span className="text-zinc-400"> {interim}</span>}
-                    {!text && !interim && <span className="text-zinc-400">Listening…</span>}
+                    {!text && !interim && <span className="text-zinc-400">{t("liveTranscriptListening", src)}</span>}
                   </p>
                 ) : (
                   <textarea
@@ -953,7 +963,7 @@ function ParagraphLayout({
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type or talk. Press Enter twice to break a paragraph."
+                    placeholder={t("sourcePlaceholderIdle", src)}
                     rows={1}
                     lang={LANG_META[src].bcp47}
                     spellCheck
@@ -970,7 +980,7 @@ function ParagraphLayout({
               ) : translating ? (
                 <span className="text-zinc-400">translating…</span>
               ) : (
-                <span className="text-zinc-400">Translation will appear here…</span>
+                <span className="text-zinc-400">{t("targetPlaceholder", tgt)}</span>
               )}
             </p>
           </li>
@@ -1098,14 +1108,14 @@ function StreamLayout({
               <p className="text-xl leading-snug font-medium">
                 {sourceText}
                 {interim && <span className="text-zinc-400"> {interim}</span>}
-                {!sourceText && !interim && <span className="text-zinc-400">Listening…</span>}
+                {!sourceText && !interim && <span className="text-zinc-400">{t("liveTranscriptListening", src)}</span>}
               </p>
             ) : (
               <textarea
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Tap the mic or type here — translation streams below."
+                placeholder={t("sourcePlaceholderIdle", src)}
                 rows={2}
                 lang={LANG_META[src].bcp47}
                 spellCheck
@@ -1132,7 +1142,7 @@ function StreamLayout({
             </div>
           )}
           <p className={`text-xl leading-snug font-semibold ${committed.length > 0 ? "mt-3" : "mt-1.5"}`}>
-            {tgtText || <span className="text-zinc-400 font-normal">Translation will appear here…</span>}
+            {tgtText || <span className="text-zinc-400 font-normal">{t("targetPlaceholder", tgt)}</span>}
           </p>
           <DevBadge n={5} label="tgt·stream" />
         </div>
@@ -1189,21 +1199,21 @@ function TranscribeLayout({
       <div className="relative flex-1 min-h-[12rem] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 pb-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center justify-between">
           <FlagLabel lang={src} />
-          <span className="system-label text-zinc-500 dark:text-zinc-400">▸ TRANSCRIBE</span>
+          <span className="system-label text-zinc-500 dark:text-zinc-400">{t("transcribeLabel", src)}</span>
         </div>
         <div className="mt-2 min-h-[4.5rem]">
           {isListening ? (
             <p className="text-xl leading-relaxed font-medium whitespace-pre-wrap">
               {text}
               {interim && <span className="text-zinc-400"> {interim}</span>}
-              {!text && !interim && <span className="text-zinc-400">Listening…</span>}
+              {!text && !interim && <span className="text-zinc-400">{t("liveTranscriptListening", src)}</span>}
             </p>
           ) : (
             <textarea
               ref={taRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Tap the mic to dictate, or paste/drop text here…"
+              placeholder={t("transcribeIdle", src)}
               rows={3}
               lang={LANG_META[src].bcp47}
               spellCheck

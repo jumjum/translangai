@@ -212,6 +212,7 @@ function CombinedPicker({
                 onClick={() => {
                   onChangeSrc(l);
                   bumpPair(l, tgt);
+                  onClose();
                 }}
                 title={l === tgt ? "Same as target — switches to transcription mode" : undefined}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
@@ -260,6 +261,7 @@ function CombinedPicker({
                 onClick={() => {
                   onChangeTgt(l);
                   bumpPair(src, l);
+                  onClose();
                 }}
                 title={l === src ? "Same as source — switches to transcription mode" : undefined}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${

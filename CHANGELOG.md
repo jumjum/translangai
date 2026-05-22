@@ -4,6 +4,28 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.11.8] — 2026-05-22
+
+### Added
+- **Localised in-field placeholders** (`src/lib/i18n.ts`). Source-side placeholders ("Type or talk…" / "Listening…") render in the **source** language; target-side ("Translation will appear here…") renders in the **target** language. Covers all 8 supported langs (EN · RU · DA · DE · SV · PT · PL · ES). Falls back to English for missing keys.
+
+### Changed
+- **Combined language picker closes after one selection** — picking either side calls `onClose()`. The dropdown was lingering open even after a definitive choice; most users only change one side at a time.
+- **PWA splash background → mid-grey** (`#3f3f46`). Matches the centre stop of the logo's chip gradient so the Android startup screen reads as a continuous frame around the logo instead of a black backdrop. `theme_color` on the layout matches.
+- **Sticky-bottom auto-scroll on the Split-view target pane** — latest translation always in view as content arrives. Yields when the user scrolls up to read older content, same pattern as Pairs / Stream.
+
+### Logo
+- Dialled the +50% strokes back by 20% (now 3.8 px main stroke in `icon.svg`, 5.0 px in the favicon, 3.8 in the header SVG) — cleaner look without losing legibility at favicon scale.
+
+### Documented (no code yet)
+- DESIGN §22 **Speech-recognition quality strategy** — Web Speech API quality is fixed per browser/OS; we'll add an optional LLM-based "polish" step (Claude Haiku / Gemini Flash, ~$0.001 per polish) that punctuates, capitalises, and fixes obvious mishears on a per-paragraph basis. Free-mode-off + opt-in. v0.12.
+- DESIGN §23 **Multi-user paired phones** — two phones, one conversation, each mic optimal for its speaker. WebRTC DataChannel + QR-code pairing.
+- DESIGN §24 **Modular / vertical TransLangAI** — monorepo plan for tailored verticals (medical, police, insurance) with on-prem deploy option.
+- DESIGN §25 **Camera OCR via Tesseract.js** — fills the Google Translate "camera" gap with open source, runs entirely in-browser.
+- DESIGN §26 **Native mobile path** — Android via TWA (1 day) → Tauri 2 mobile (later). macOS via the existing Tauri scaffold.
+
+---
+
 ## [0.11.2] — 2026-05-22
 
 ### Added

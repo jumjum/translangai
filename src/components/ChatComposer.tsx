@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import DevBadge from "@/components/DevBadge";
 import { readDroppedText } from "@/lib/drop";
+import { t } from "@/lib/i18n";
 import { useAutoGrowTextarea } from "@/lib/segmenter";
 import { LANG_META, type Lang } from "@/lib/types";
 import { BTN_CHIP } from "@/lib/ui";
@@ -85,7 +86,7 @@ export default function ChatComposer({
         ref={taRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={listening ? "Listening — speak now…" : "Type or talk…"}
+        placeholder={t(listening ? "sourcePlaceholderListening" : "sourcePlaceholderIdle", srcLang)}
         rows={1}
         lang={LANG_META[srcLang].bcp47}
         spellCheck
