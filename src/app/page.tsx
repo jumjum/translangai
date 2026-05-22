@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import LiveTranslator from "@/components/LiveTranslator";
 import CompareView from "@/components/CompareView";
 import HistoryPanel from "@/components/HistoryPanel";
+import EdgeSwipeListener from "@/components/EdgeSwipeListener";
 import DevBadge from "@/components/DevBadge";
 import DevLinksDrawer from "@/components/DevLinksDrawer";
 import type { Session } from "@/lib/history";
@@ -61,12 +62,14 @@ export default function Home() {
     >
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
+          {/* History button — hidden on mobile (use left-edge swipe);
+              visible on sm+ as a click target. */}
           <button
             type="button"
             onClick={() => setHistoryOpen(true)}
             aria-label="Open history"
-            title="History"
-            className={`relative grid h-9 w-9 place-items-center rounded-xl active:scale-95 ${BTN_CHIP}`}
+            title="History (or swipe in from the left edge on touch devices)"
+            className={`relative hidden sm:grid h-9 w-9 place-items-center rounded-xl active:scale-95 ${BTN_CHIP}`}
           >
             <HistoryIcon className="h-4 w-4" />
             <DevBadge n="H" label="history" />
@@ -118,6 +121,11 @@ export default function Home() {
           setMode("live"); // history rows always restore into Live mode
           setLoadedSession(s);
         }}
+      />
+      <EdgeSwipeListener
+        open={historyOpen}
+        onOpen={() => setHistoryOpen(true)}
+        onClose={() => setHistoryOpen(false)}
       />
     </main>
   );
