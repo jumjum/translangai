@@ -4,6 +4,21 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.11.9] — 2026-05-22
+
+### Changed
+- **Language picker now stays open** across picks (reversed v0.11.8's auto-close). Closes on outside-click, Escape, or the new **✕ button** in the header's top-right corner. Footer hint updated to reflect this. Most users switch one side at a time but the ones who switch both wanted two picks without re-opening — picker behaviour now matches that workflow.
+- **Source language label in the chat composer** (Split view). The composer now shows `🇸🇪 Svenska` above the bar, mirroring the target pane's flag label at the top of the screen. Tapping it opens the language picker — same affordance as the target pane.
+
+### Note on speech-recognition pauses (no code change)
+Long-form Swedish dictation looks "chopped into pieces" because the **Web Speech API delivers a `final` result at every natural pause** — the OS-level recogniser inserts a sentence boundary there. We already concatenate them with a space, so the rendered text *is* continuous. The variation in spacing / punctuation is the recogniser's choice, not ours.
+
+To genuinely fix punctuation + capitalisation in Swedish (and any language where the browser ASR is weak), see DESIGN §22:
+1. **LLM polish step** on commit (Claude Haiku / Gemini Flash, ~$0.0005/paragraph) — adds punctuation + capitalisation + fixes obvious mishears. v0.12.
+2. **Cloud Whisper** for browser-recorded audio (~$0.006/min) — much better Swedish quality than browser ASR. Lands with the §16 audio-file work.
+
+---
+
 ## [0.11.8] — 2026-05-22
 
 ### Added

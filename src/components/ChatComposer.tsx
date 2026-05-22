@@ -53,9 +53,27 @@ export default function ChatComposer({
   };
 
   return (
-    <div
-      className="relative flex items-end gap-1.5 rounded-2xl border border-zinc-300 bg-white p-1.5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
-    >
+    <div className="flex flex-col gap-1">
+      {/* Source-language label — same affordance as the target pane: tap
+          the flag to open the combined picker. Keeps both fields'
+          language visibility symmetrical. */}
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("translangai:openLangPicker"));
+          }
+        }}
+        title={`${LANG_META[srcLang].name} — tap to change languages`}
+        className="self-start flex items-center gap-2 rounded-md px-1 py-0.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+      >
+        <span className="text-base leading-none">{LANG_META[srcLang].flag}</span>
+        <span>{LANG_META[srcLang].native}</span>
+      </button>
+
+      <div
+        className="relative flex items-end gap-1.5 rounded-2xl border border-zinc-300 bg-white p-1.5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
+      >
       {/* + button — file / camera / stream menu (currently file picker). */}
       <button
         type="button"
@@ -136,6 +154,7 @@ export default function ChatComposer({
           )}
           <DevBadge n={2} label="mic" position="tr" />
         </button>
+      </div>
       </div>
     </div>
   );

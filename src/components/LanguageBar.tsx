@@ -197,10 +197,19 @@ function CombinedPicker({
       aria-label="Choose language pair"
       className="absolute left-1/2 bottom-full z-30 mb-2 -translate-x-1/2 w-[22rem] sm:w-[26rem] overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
     >
-      <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-zinc-200 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+      <header className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-zinc-200 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
         <span className="text-left">Source</span>
         <span aria-hidden>·</span>
-        <span className="text-right">Target</span>
+        <span className="text-right pr-6">Target</span>
+        {/* Close button — picker stays open across picks; click ✕ or outside to close. */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close language picker"
+          className="absolute right-1 top-1/2 -translate-y-1/2 grid h-6 w-6 place-items-center rounded text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        >
+          ✕
+        </button>
       </header>
       <div className="grid grid-cols-[1fr_auto_1fr]">
         {/* Left — source column */}
@@ -212,7 +221,9 @@ function CombinedPicker({
                 onClick={() => {
                   onChangeSrc(l);
                   bumpPair(l, tgt);
-                  onClose();
+                  // Picker stays open — user might still want to change
+                  // the target. Close via the ✕ in the corner or by
+                  // clicking outside.
                 }}
                 title={l === tgt ? "Same as target — switches to transcription mode" : undefined}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
@@ -261,7 +272,7 @@ function CombinedPicker({
                 onClick={() => {
                   onChangeTgt(l);
                   bumpPair(src, l);
-                  onClose();
+                  // Same as source column — picker stays open.
                 }}
                 title={l === src ? "Same as source — switches to transcription mode" : undefined}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
@@ -280,14 +291,7 @@ function CombinedPicker({
         </ul>
       </div>
       <footer className="border-t border-zinc-200 px-3 py-1.5 text-[10px] text-zinc-400 dark:border-zinc-800">
-        Click a language to pick it. Click both columns to change the whole pair in one go.
-        <button
-          type="button"
-          onClick={onClose}
-          className="float-right text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-        >
-          Done
-        </button>
+        Click languages on either side — picker stays open until you click ✕ or outside.
       </footer>
     </div>
   );
