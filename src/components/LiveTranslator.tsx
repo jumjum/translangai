@@ -21,6 +21,8 @@ import {
   useSpeechRecognition,
 } from "@/lib/speech";
 import { t } from "@/lib/i18n";
+import { loadSettings } from "@/lib/settings";
+import { recordUsage } from "@/lib/usage";
 import { LANG_META, type Lang, type TranslateResult } from "@/lib/types";
 import { BTN_CHIP, BTN_CHIP_ACTIVE, BTN_HERO } from "@/lib/ui";
 
@@ -380,6 +382,58 @@ export default function LiveTranslator({
     }
   }
 
+  // ── Polish: punctuation + capitalisation + mishear-fix via LLM ─────────
+  // Reads the current settings each call so the user can toggle the
+  // provider live in the R&D drawer and see the next polish use it.
+  const [polishing, setPolishing] = useState(false);
+  const polishText = useCallback(
+    async (raw: string, lang: Lang): Promise<string | null> => {
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      const settings = loadSettings();
+      setPolishing(true);
+      try {
+        const r = await fetch("/api/polish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: trimmed, lang, provider: settings.polishProvider }),
+        });
+        if (!r.ok) return null;
+        const data = (await r.json()) as {
+          polished: string;
+          provider: string;
+          model: string;
+          inputTokens: number;
+          outputTokens: number;
+          costUsd: number;
+          latencyMs: number;
+          fallback?: boolean;
+        };
+        // Always record usage — even fallback (zero-cost) entries let us
+        // see how often we're hitting "no key" paths.
+        recordUsage({
+          ts: Date.now(),
+          endpoint: "polish",
+          provider: data.provider,
+          model: data.model,
+          inputTokens: data.inputTokens,
+          outputTokens: data.outputTokens,
+          costUsd: data.costUsd,
+          words: trimmed.split(/\s+/).filter(Boolean).length,
+          latencyMs: data.latencyMs,
+          src: lang,
+        });
+        if (data.fallback) return null;
+        return data.polished;
+      } catch {
+        return null;
+      } finally {
+        setPolishing(false);
+      }
+    },
+    [],
+  );
+
   const startSpeaking = useCallback(
     (text: string) => {
       stopSpeaking();
@@ -553,6 +607,8 @@ export default function LiveTranslator({
           summary={summary}
           summarizing={summarizing}
           requestSummary={requestSummary}
+          polishText={polishText}
+          polishing={polishing}
           taRef={taRef}
           clearAll={clearAll}
           controls={controlCluster}
@@ -1172,6 +1228,8 @@ function TranscribeLayout({
   summary,
   summarizing,
   requestSummary,
+  polishText,
+  polishing,
   taRef,
   clearAll,
   controls,
@@ -1185,12 +1243,15 @@ function TranscribeLayout({
   summary: { text: string; provider: string; note?: string } | null;
   summarizing: boolean;
   requestSummary: (text: string) => void;
+  polishText: (raw: string, lang: Lang) => Promise<string | null>;
+  polishing: boolean;
   taRef: (el: HTMLTextAreaElement | null) => void;
   clearAll: () => void;
   controls: React.ReactNode;
 }) {
   const live = isListening ? text + (interim ? (text ? " " : "") + interim : "") : text;
   const canSummarise = live.trim().length > 0 && !summarizing;
+  const canPolish = live.trim().length > 0 && !polishing;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -1261,9 +1322,25 @@ function TranscribeLayout({
         </div>
       )}
 
-      {/* Mic cluster + Summarise side-button. */}
-      <div className="relative flex items-center justify-center gap-3">
+      {/* Mic cluster + Polish + Summarise side-buttons. */}
+      <div className="relative flex items-center justify-center gap-2">
         {controls}
+        <button
+          type="button"
+          onClick={async () => {
+            if (!canPolish) return;
+            const cleaned = await polishText(live, src);
+            if (cleaned) setText(cleaned);
+          }}
+          disabled={!canPolish}
+          aria-label="Polish transcript (LLM punctuation + capitalisation)"
+          title="Polish — add punctuation + capitalisation via LLM (enable in R&D · Polish)"
+          className={`relative inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${BTN_CHIP}`}
+        >
+          <span className="font-mono uppercase tracking-[0.14em]">{polishing ? "…" : "✨"}</span>
+          <span className="hidden sm:inline">polish</span>
+          <DevBadge n="P" label="polish" position="tr" />
+        </button>
         <button
           type="button"
           onClick={() => canSummarise && requestSummary(live)}

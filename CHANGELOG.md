@@ -4,6 +4,46 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.12.0] — 2026-05-22
+
+### Added — LLM polish + R&D admin dashboard (DESIGN §22)
+
+**Polish endpoint** (`/api/polish`)
+- POST `{ text, lang, provider }` → `{ polished, provider, model, inputTokens, outputTokens, costUsd, latencyMs }`.
+- Three providers, all priced cheap-to-cheaper:
+  - `gemini` — Gemini 2.0 Flash (~$0.0001 per ~100-word polish). Default. Needs `GEMINI_API_KEY`.
+  - `claude-haiku` — Claude Haiku 4.5 (~$0.0008 per polish). Better quality, slightly slower. Needs `ANTHROPIC_API_KEY`.
+  - `groq` — Llama 3.1 8b on Groq free tier (zero cost, fastest, more brittle). Needs `GROQ_API_KEY`.
+- Prompt instructs the model to **add punctuation + capitalisation + fix obvious mishears** while preserving the speaker's voice. Conservative — no rewriting of meaning.
+- GET `/api/polish` returns which provider keys are configured server-side so the dashboard can disable unavailable choices.
+
+**Polish UI**
+- ✨ **polish** button next to Σ summarise in Transcribe mode. One tap → cleaned transcript replaces the raw text in-place.
+- "P" DevBadge for reference.
+
+**Settings (`src/lib/settings.ts`)**
+- Persists in `localStorage:translangai:settings`. Reactive via custom event.
+- Three keys: `polishEnabled`, `polishAutoOnCommit`, `polishProvider`. Defaults: off / off / gemini.
+
+**Usage tracking (`src/lib/usage.ts`)**
+- Every `/api/polish` response is recorded with timestamp, provider, model, token counts, cost, word count, latency.
+- FIFO cap at 2000 entries.
+- `summariseUsage()` rolls everything up: totals, by-provider, by-endpoint, last-24h cost.
+
+**R&D admin panel (`src/components/AdminPanel.tsx`)**
+- Embedded at the **top** of the existing R&D drawer (the link sections moved below).
+- **Settings**: polish on/off, auto-on-commit, provider chooser. Provider options grey out when their key isn't configured server-side.
+- **Usage dashboard**: calls / input-tokens / output-tokens / words / avg-latency / total cost / last-24h cost. Broken down by provider. Linear monthly + yearly projection from the 24h pace. "Clear" button wipes local stats.
+
+### Cost reality check
+At Gemini 2.0 Flash pricing a 100-word Swedish paragraph costs **~$0.000075** — half of one tenth of a cent. 10,000 polishes / month = $0.75. Practically free. Charging users for this in a Pro tier would be a fairness call, not a cost-recovery one.
+
+### Notes
+- Polish is **disabled by default**. Turn on in R&D · drawer · Settings · "Polish enabled".
+- No auth yet, so "per user" stats = "this device". When DESIGN §18 Pro tier ships, the same `recordUsage()` calls will mirror to the server for cross-device.
+
+---
+
 ## [0.11.9] — 2026-05-22
 
 ### Changed

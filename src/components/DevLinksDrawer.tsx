@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AdminPanel from "@/components/AdminPanel";
 import { BTN_CHIP } from "@/lib/ui";
 
 /**
@@ -143,6 +144,11 @@ export default function DevLinksDrawer() {
           </header>
 
           <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {/* Admin (settings + usage dashboard) sits at the top — it's
+                what you read on every visit; the link sections below are
+                infrequent reference material. */}
+            <AdminPanel />
+
             {SECTIONS.map((s) => (
               <section key={s.title} className="px-3 py-2">
                 <p className="system-label mb-1.5 text-zinc-500 dark:text-zinc-400">{s.title}</p>
