@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DevBadge from "@/components/DevBadge";
 import { parseLangPair } from "@/lib/langNames";
 import { bumpPair, rankLangs } from "@/lib/langPairStats";
@@ -195,7 +195,7 @@ function CombinedPicker({
     <div
       role="dialog"
       aria-label="Choose language pair"
-      className="absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2 w-[22rem] sm:w-[26rem] overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
+      className="absolute left-1/2 bottom-full z-30 mb-2 -translate-x-1/2 w-[22rem] sm:w-[26rem] overflow-hidden rounded-xl border border-zinc-300 bg-white shadow-xl ring-1 ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:ring-white/5"
     >
       <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-zinc-200 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
         <span className="text-left">Source</span>
@@ -317,7 +317,7 @@ function LangChip({
         width="10"
         height="6"
         viewBox="0 0 10 6"
-        className={`opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
+        className={`opacity-60 transition-transform ${open ? "" : "rotate-180"}`}
       >
         <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
       </svg>
@@ -329,6 +329,14 @@ export default function LanguageBar({ src, tgt, onChangeSrc, onChangeTgt, onSwap
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   useClickAway(wrapRef, open, () => setOpen(false));
+
+  // Field-corner flags in the panes also need to open this picker.
+  // We listen for a custom event dispatched from FlagLabel onClick.
+  useEffect(() => {
+    const open = () => setOpen(true);
+    window.addEventListener("translangai:openLangPicker", open);
+    return () => window.removeEventListener("translangai:openLangPicker", open);
+  }, []);
 
   return (
     <div ref={wrapRef} className="relative flex items-center gap-1.5 sm:gap-2">

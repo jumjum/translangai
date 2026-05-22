@@ -195,15 +195,15 @@ function Logo() {
       >
         {/* Hairline inner frame — gives the chip a "machined" edge */}
         <span className="pointer-events-none absolute inset-[2px] rounded-[9px] border border-zinc-400/35" />
-        {/* Culture-glyph: two arc brackets + center node + IO traces — bumped another +50% (v0.11.3) for legibility at the 36px header chip size. */}
+        {/* Culture-glyph: two arc brackets + center node + IO traces — v0.11.7 dialed back 20% from the +50% pass for a cleaner look at 36px. */}
         <svg viewBox="0 0 64 64" className="relative h-6 w-6" fill="none" aria-hidden>
-          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="4.8" strokeLinecap="round" />
-          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="4.8" strokeLinecap="round" />
-          <circle cx="32" cy="32" r="4.5" fill="#fafafa" />
-          <line x1="10" y1="32" x2="17" y2="32" stroke="#fafafa" strokeWidth="2.7" strokeLinecap="round" opacity="0.85" />
-          <line x1="47" y1="32" x2="54" y2="32" stroke="#fafafa" strokeWidth="2.7" strokeLinecap="round" opacity="0.85" />
-          <circle cx="10" cy="32" r="2.7" fill="#fafafa" />
-          <circle cx="54" cy="32" r="2.7" fill="#fafafa" />
+          <path d="M 26 18 Q 18 32 26 46" stroke="#fafafa" strokeWidth="3.8" strokeLinecap="round" />
+          <path d="M 38 18 Q 46 32 38 46" stroke="#fafafa" strokeWidth="3.8" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="3.6" fill="#fafafa" />
+          <line x1="10" y1="32" x2="17" y2="32" stroke="#fafafa" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
+          <line x1="47" y1="32" x2="54" y2="32" stroke="#fafafa" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
+          <circle cx="10" cy="32" r="2.2" fill="#fafafa" />
+          <circle cx="54" cy="32" r="2.2" fill="#fafafa" />
         </svg>
       </span>
       <div className="flex flex-col leading-tight">

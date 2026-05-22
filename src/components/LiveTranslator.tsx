@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import LanguageBar from "@/components/LanguageBar";
+import ChatComposer from "@/components/ChatComposer";
 import DevBadge from "@/components/DevBadge";
 import VoiceControl from "@/components/VoiceControl";
 import { readDroppedText } from "@/lib/drop";
@@ -516,30 +517,19 @@ export default function LiveTranslator({
           </div>
         </div>
       )}
-      {/* ── Toolbar row: language bar + view switcher + voice control ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-        <div className="relative">
-          <LanguageBar
-            src={src}
-            tgt={tgt}
-            onChangeSrc={setSrc}
-            onChangeTgt={setTgt}
-            onSwap={swapWithText}
-          />
-          <DevBadge n={6} label="lang" />
-        </div>
-        <div className="flex items-center gap-2">
-          <ViewSwitcher view={view} setView={setView} />
-          <VoiceControl
-            voices={voices}
-            voiceURI={voiceURI}
-            onPickVoice={pickVoice}
-            autoSpeak={autoSpeak}
-            onToggleAutoSpeak={() => setAutoSpeak((v) => !v)}
-            ttsSupported={ttsSupported}
-            tgt={tgt}
-          />
-        </div>
+      {/* ── Top toolbar — view switcher + voice control. LanguageBar moved
+          to the very bottom (thumb-zone), dropdown expands upward. ── */}
+      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <ViewSwitcher view={view} setView={setView} />
+        <VoiceControl
+          voices={voices}
+          voiceURI={voiceURI}
+          onPickVoice={pickVoice}
+          autoSpeak={autoSpeak}
+          onToggleAutoSpeak={() => setAutoSpeak((v) => !v)}
+          ttsSupported={ttsSupported}
+          tgt={tgt}
+        />
       </div>
 
       {/* ── View-specific layout ───────────────────────────────────────────── */}
@@ -564,15 +554,9 @@ export default function LiveTranslator({
 
       {src !== tgt && view === "split" && (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          {/* Chat-paradigm: TARGET on top fills available vertical space;
-              SOURCE at bottom grows upward as the user types (textarea
-              auto-grow capped at 50dvh); MIC CLUSTER pinned at the bottom
-              in the thumb zone. No empty real estate — when source is
-              short the target gets nearly all the height, and vice versa.
-              When both grow to meet in the middle they scroll internally. */}
-
-          {/* Translation pane — flex-1 fills remaining space. */}
-          <div className="relative flex-1 min-h-[8rem] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+          {/* Translation pane — flex-1 fills available vertical space.
+              Reads like an incoming chat message. */}
+          <div className="relative flex-1 min-h-[10rem] overflow-y-auto rounded-2xl border border-zinc-300 bg-zinc-100/70 p-4 pb-12 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
             <FlagLabel lang={tgt} loading={translating} />
             {pairsCommitted.length > 0 && (
               <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
@@ -604,43 +588,17 @@ export default function LiveTranslator({
             <DevBadge n={5} label="tgt" />
           </div>
 
-          {/* Source pane — content-sized, anchored at the bottom. Grows
-              upward as the user types; caps at 50dvh and scrolls. */}
-          <div className="relative shrink-0 max-h-[50dvh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 pb-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <FlagLabel lang={src} />
-            {pairsCommitted.length > 0 && (
-              <div className="mt-2 space-y-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
-                {pairsCommitted.map((p) => (
-                  <p
-                    key={p.id}
-                    className="text-[17px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300"
-                  >
-                    {p.src}
-                  </p>
-                ))}
-              </div>
-            )}
-            <div className={pairsCommitted.length > 0 ? "mt-3" : "mt-2"}>{sourceField}</div>
-            {(sourceText || pairsCommitted.length > 0) && (
-              <button
-                type="button"
-                onClick={clearAll}
-                aria-label="Clear"
-                className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full text-zinc-400 hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                ✕
-              </button>
-            )}
-            <FieldActions
-              text={[...pairsCommitted.map((p) => p.src), sourceText].filter(Boolean).join("\n\n")}
-              lang={src}
-              ttsSupported={ttsSupported}
-            />
-            <DevBadge n={1} label="src" />
-          </div>
-
-          {/* Mic cluster — thumb-zone, very bottom of the live view. */}
-          {controlCluster}
+          {/* Chat composer — single bottom-anchored bar with +, textarea, mic. */}
+          <ChatComposer
+            value={text}
+            onChange={setText}
+            srcLang={src}
+            listening={speech.listening}
+            asrSupported={asrSupported}
+            onToggleMic={speech.toggle}
+            onClear={clearAll}
+            onDropText={(t) => setText(text ? text + "\n\n" + t : t)}
+          />
         </div>
       )}
 
@@ -675,6 +633,18 @@ export default function LiveTranslator({
           controls={controlCluster}
         />
       )}
+
+      {/* ── Bottom language bar (thumb-zone, dropdown expands upward) ── */}
+      <div className="relative flex justify-center">
+        <LanguageBar
+          src={src}
+          tgt={tgt}
+          onChangeSrc={setSrc}
+          onChangeTgt={setTgt}
+          onSwap={swapWithText}
+        />
+        <DevBadge n={6} label="lang" />
+      </div>
 
       {/* Executive summary card */}
       {(summary || summarizing) && (
@@ -1377,14 +1347,26 @@ function FieldActions({
 }
 
 function FlagLabel({ lang, loading }: { lang: Lang; loading?: boolean }) {
+  // Clickable: opens the combined language picker (listened for in
+  // LanguageBar via a window event). Lets the user change languages
+  // by tapping the flag in either field's top-left corner.
   return (
-    <div className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+    <button
+      type="button"
+      onClick={() => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("translangai:openLangPicker"));
+        }
+      }}
+      title={`${LANG_META[lang].name} — tap to change languages`}
+      className="flex items-center gap-2 rounded-md px-1 py-0.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+    >
       <span className="text-base leading-none">{LANG_META[lang].flag}</span>
       <span>{LANG_META[lang].native}</span>
       {loading && (
-        <span className="ml-2 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-900 dark:bg-zinc-100" />
+        <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-900 dark:bg-zinc-100" />
       )}
-    </div>
+    </button>
   );
 }
 
