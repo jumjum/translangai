@@ -26,6 +26,8 @@ export default function ChatComposer({
   onChange,
   srcLang,
   listening,
+  finalText,
+  interim,
   asrSupported,
   onToggleMic,
   onClear,
@@ -35,6 +37,9 @@ export default function ChatComposer({
   onChange: (v: string) => void;
   srcLang: Lang;
   listening: boolean;
+  /** During listening, show this (committed-by-ASR) + greyed interim. */
+  finalText?: string;
+  interim?: string;
   asrSupported: boolean;
   onToggleMic: () => void;
   onClear: () => void;
@@ -99,17 +104,40 @@ export default function ChatComposer({
         }}
       />
 
-      {/* The textarea — auto-grows upward. */}
-      <textarea
-        ref={taRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={t(listening ? "sourcePlaceholderListening" : "sourcePlaceholderIdle", srcLang)}
-        rows={1}
-        lang={LANG_META[srcLang].bcp47}
-        spellCheck
-        className="block min-h-[2.25rem] w-full resize-none bg-transparent px-1 py-2 text-[15px] leading-snug outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
-      />
+      {/* During listening: a live, read-only preview that shows ASR finals
+          + greyed interim. Outside listening: the editable textarea.
+          (Why the swap: the parent only mirrors `finalText` into `value`
+          when ASR commits — so interim text would never make it into the
+          textarea, and the user would see an empty box while speaking.) */}
+      {listening ? (
+        <p
+          aria-live="polite"
+          lang={LANG_META[srcLang].bcp47}
+          className="block min-h-[2.25rem] w-full px-1 py-2 text-[15px] leading-snug whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-900 dark:text-zinc-100"
+        >
+          {finalText}
+          {interim && (
+            <>
+              {finalText ? " " : ""}
+              <span className="text-zinc-400">{interim}</span>
+            </>
+          )}
+          {!finalText && !interim && (
+            <span className="text-zinc-400">{t("sourcePlaceholderListening", srcLang)}</span>
+          )}
+        </p>
+      ) : (
+        <textarea
+          ref={taRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={t("sourcePlaceholderIdle", srcLang)}
+          rows={1}
+          lang={LANG_META[srcLang].bcp47}
+          spellCheck
+          className="block min-h-[2.25rem] w-full resize-none bg-transparent px-1 py-2 text-[15px] leading-snug [overflow-wrap:anywhere] outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+        />
+      )}
 
       {/* Right cluster — clear-when-text, mic always. */}
       <div className="flex shrink-0 items-end gap-1">

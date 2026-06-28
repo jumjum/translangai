@@ -525,12 +525,12 @@ export default function LiveTranslator({
   // ── Source field — used by Split view ─────────────────────────────────────
   // Wrapped in a min-height container so toggling between the live transcript
   // <p> and the editable <textarea> doesn't visually shrink the source pane.
-  // whitespace-pre-wrap preserves user-typed newlines (return key carries
+  // whitespace-pre-wrap [overflow-wrap:anywhere] preserves user-typed newlines (return key carries
   // through to layout) so the source text reads the way it was written.
   const sourceField = (
     <div className="min-h-[4.5rem]">
       {speech.listening ? (
-        <p className="text-2xl leading-snug font-medium whitespace-pre-wrap">
+        <p className="text-2xl leading-snug font-medium whitespace-pre-wrap [overflow-wrap:anywhere] [overflow-wrap:anywhere]">
           {speech.finalText}
           {speech.interim && <span className="text-zinc-400"> {speech.interim}</span>}
           {!speech.finalText && !speech.interim && (
@@ -554,7 +554,7 @@ export default function LiveTranslator({
 
   const targetField =
     tgtText ? (
-      <p className="text-2xl leading-snug font-semibold whitespace-pre-wrap">{tgtText}</p>
+      <p className="text-2xl leading-snug font-semibold whitespace-pre-wrap [overflow-wrap:anywhere] [overflow-wrap:anywhere]">{tgtText}</p>
     ) : translating ? (
       <div className="space-y-2">
         <div className="h-6 w-2/3 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
@@ -629,7 +629,7 @@ export default function LiveTranslator({
                 {pairsCommitted.map((p) => (
                   <p
                     key={p.id}
-                    className="text-[17px] leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300"
+                    className="text-[17px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-700 dark:text-zinc-300"
                   >
                     {p.tgt || <span className="text-zinc-400">…</span>}
                   </p>
@@ -660,6 +660,8 @@ export default function LiveTranslator({
             onChange={setText}
             srcLang={src}
             listening={speech.listening}
+            finalText={speech.finalText}
+            interim={speech.interim}
             asrSupported={asrSupported}
             onToggleMic={speech.toggle}
             onClear={clearAll}
@@ -990,12 +992,12 @@ function ParagraphLayout({
         <ul className="space-y-6">
           {committed.map((p) => (
             <li key={p.id} className="space-y-2">
-              <p className="text-[17px] leading-relaxed font-medium text-zinc-900 whitespace-pre-wrap dark:text-zinc-100">
+              <p className="text-[17px] leading-relaxed font-medium text-zinc-900 whitespace-pre-wrap [overflow-wrap:anywhere] dark:text-zinc-100">
                 <span className="mr-2 align-middle text-base leading-none">{LANG_META[src].flag}</span>
                 {p.src}
               </p>
               <hr className="border-t border-zinc-300/80 dark:border-zinc-700/70" />
-              <p className="text-[17px] leading-relaxed text-zinc-700 whitespace-pre-wrap dark:text-zinc-300">
+              <p className="text-[17px] leading-relaxed text-zinc-700 whitespace-pre-wrap [overflow-wrap:anywhere] dark:text-zinc-300">
                 <span className="mr-2 align-middle text-base leading-none">{LANG_META[tgt].flag}</span>
                 {p.tgt || <span className="text-zinc-400">…</span>}
               </p>
@@ -1008,7 +1010,7 @@ function ParagraphLayout({
               <span className="mt-1 align-middle text-base leading-none">{LANG_META[src].flag}</span>
               <div className="flex-1">
                 {isListening ? (
-                  <p className="text-[17px] leading-relaxed font-medium whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
+                  <p className="text-[17px] leading-relaxed font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-900 dark:text-zinc-100">
                     {text}
                     {interim && <span className="text-zinc-400"> {interim}</span>}
                     {!text && !interim && <span className="text-zinc-400">{t("liveTranscriptListening", src)}</span>}
@@ -1023,13 +1025,13 @@ function ParagraphLayout({
                     rows={1}
                     lang={LANG_META[src].bcp47}
                     spellCheck
-                    className="block w-full resize-none bg-transparent text-[17px] leading-relaxed font-medium whitespace-pre-wrap outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+                    className="block w-full resize-none bg-transparent text-[17px] leading-relaxed font-medium whitespace-pre-wrap [overflow-wrap:anywhere] outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                   />
                 )}
               </div>
             </div>
             <hr className="border-t border-dashed border-zinc-300 dark:border-zinc-700" />
-            <p className="text-[17px] leading-relaxed text-zinc-700 whitespace-pre-wrap dark:text-zinc-300">
+            <p className="text-[17px] leading-relaxed text-zinc-700 whitespace-pre-wrap [overflow-wrap:anywhere] dark:text-zinc-300">
               <span className="mr-2 align-middle text-base leading-none">{LANG_META[tgt].flag}</span>
               {tgtText ? (
                 tgtText
@@ -1153,7 +1155,7 @@ function StreamLayout({
           {committed.length > 0 && (
             <div className="mt-2 space-y-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
               {committed.map((p) => (
-                <p key={p.id} className="text-xl leading-snug whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                <p key={p.id} className="text-xl leading-snug whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-700 dark:text-zinc-300">
                   {p.src}
                 </p>
               ))}
@@ -1191,7 +1193,7 @@ function StreamLayout({
           {committed.length > 0 && (
             <div className="mt-2 space-y-3 border-b border-zinc-300/70 pb-3 dark:border-zinc-700/60">
               {committed.map((p) => (
-                <p key={p.id} className="text-xl leading-snug whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                <p key={p.id} className="text-xl leading-snug whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-700 dark:text-zinc-300">
                   {p.tgt || <span className="text-zinc-400">…</span>}
                 </p>
               ))}
@@ -1264,7 +1266,7 @@ function TranscribeLayout({
         </div>
         <div className="mt-2 min-h-[4.5rem]">
           {isListening ? (
-            <p className="text-xl leading-relaxed font-medium whitespace-pre-wrap">
+            <p className="text-xl leading-relaxed font-medium whitespace-pre-wrap [overflow-wrap:anywhere] [overflow-wrap:anywhere]">
               {text}
               {interim && <span className="text-zinc-400"> {interim}</span>}
               {!text && !interim && <span className="text-zinc-400">{t("liveTranscriptListening", src)}</span>}
@@ -1314,7 +1316,7 @@ function TranscribeLayout({
             </div>
           ) : (
             summary && (
-              <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
+              <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] text-zinc-800 dark:text-zinc-200">
                 {summary.text}
               </p>
             )

@@ -1,4 +1,6 @@
-# TransLang AI — Design Specification (v0.11.8)
+# TransLang AI — Design Specification (v0.12.1)
+
+> §28 (version drift + ASR diagnostic): every JS bundle bakes in `APP_VERSION` from `package.json` plus the Vercel `VERCEL_GIT_COMMIT_SHA`. The R&D drawer's Build section fetches `/api/version` and compares — divergence means the browser is on a stale service-worker / CDN cache. One-click hard reload from the drawer. ASR section surfaces whether the Web Speech API is available and which BCP-47 tags the app will request, so language-pack diagnostics ("Swedish doesn't pick up audio") have a starting point.
 
 > Any-to-any dictionary & **omni-translator** for daily use. Multiple sources side-by-side. Web first, mobile-first UI, voice in/out, native macOS later.
 

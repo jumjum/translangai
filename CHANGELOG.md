@@ -4,6 +4,29 @@ All notable changes to **TransLang AI** are documented here. The project follows
 
 ---
 
+## [0.12.1] — 2026-05-22
+
+### Added — version drift detector + ASR diagnostic in R&D drawer
+
+- **`/api/version`** returns `{ version, sha, branch }` from the running server.
+- **`src/lib/version.ts`** bakes `APP_VERSION` + Vercel `BUILD_SHA` / branch into every JS bundle at build time.
+- **R&D · Build** section in the drawer now shows BOTH versions side-by-side:
+  - `Loaded bundle`: what the user's open browser is running.
+  - `Server reports`: what `/api/version` returns right now.
+  - **Sync indicator**: ✓ in-sync, or ⚠ behind · reload (one click triggers `location.reload()` to bust the service-worker / CDN cache).
+- **R&D · Speech recognition** section: shows whether `webkitSpeechRecognition` is available in this browser, lists every BCP-47 tag the app will hand the recogniser, and adds a one-paragraph note about why Swedish often needs the Android "Speech recognition" pack installed.
+
+### Fixed
+
+- **Listening transcript no longer invisible in the chat composer.** Was: composer rendered `value`, but the parent only mirrored ASR `finalText` into value — so interim text never displayed and the bar looked empty until commit. Now: while listening the composer renders a live `<p>` with `finalText` + greyed `interim`, switching back to the editable `<textarea>` only when listening stops.
+- **Long unbroken text no longer overflows the panes.** Added `[overflow-wrap:anywhere]` to all 13 `whitespace-pre-wrap` sites (transcript paragraphs, target paragraphs, Pairs source/target, Stream halves, summary card, composer). Prevents the "translation runs out the right edge" report from the Swedish dictation tests.
+
+### Hygiene
+
+- `.gitignore` now excludes the napps fleet drops (`NAPPS_DEV_PORTS.md`, `FLEET_PLAYBOOK.md`, `CHANGELOG_FLEET.md`) so they never sneak into a public-repo commit.
+
+---
+
 ## [0.12.0] — 2026-05-22
 
 ### Added — LLM polish + R&D admin dashboard (DESIGN §22)
